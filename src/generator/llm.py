@@ -14,7 +14,7 @@ class LLM:
     Describe the music with a list of keyword based on information below. Should be the more accurate possible. Don't include timestamp in the description and no-standar character like ':-.'. 
     Write in one unique line. Write nothing about the audio quality (if word noise, ignore it) and ban this word: "4 on the floor kick". The information provided may contain errors so try to cross-reference the information as much as possible. Don't describe multiple music.
     Write only tags related to the music split by ",".
-    The music is called \"{name}\" and the full no-accurate description of the music for each slice of 10 seconds is: {clap}. 
+    The music is called \"{name}\". The availabe metatags related to the track are {metatags}. The full no-accurate description of the music for each slice of 10 seconds is: {clap}. 
     """
 
     def __init__(self, llm_name: str = "google/gemma-2-2b-it"):
@@ -40,9 +40,9 @@ class LLM:
 
         prompts_list = []
         for tag in tags:
-            name, clap = tag
+            name, clap, metatags = tag
 
-            prompt = self.PROMPT.format(clap=clap, name=name).strip()
+            prompt = self.PROMPT.format(clap=clap, name=name, metatags=metatags).strip()
 
             prompt = self._tokenizer.apply_chat_template(
                 [{"role": "user", "content": prompt}],

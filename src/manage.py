@@ -25,14 +25,14 @@ class Manager:
         self,
         input_file: str = "data.txt",
         output_dir: str = "audio",
-        batch_size: int = 2,
+        batch_size: int = 6,
     ):
         """Constructor for the Manager class.
 
         Args:
             input_file (str, optional): the input file that contain url. Defaults to "data.txt".
             output_dir (str, optional): the output directory. Defaults to "audio".
-            batch_size (int, optional): the batch size. Defaults to 2.
+            batch_size (int, optional): the batch size. Defaults to 6.
         """
 
         self.filters = [DeduplicateFilter()]
@@ -57,11 +57,11 @@ class Manager:
                 filter_data.filter(self._input_file)
 
         with open(self._input_file, "r", encoding="utf-8") as f:
-            urls = []
-            for url in f:
-                urls.append(url)
+            data = []
+            for line in f:
+                data.append(line.split(";"))
 
-                if len(urls) < self._batch_size:
+                if len(data) < self._batch_size:
                     continue
 
                 logging.info("Downloading %s", self._batch_size)
@@ -70,31 +70,37 @@ class Manager:
                 with ThreadPoolExecutor(max_workers=2) as executor:
                     future_to_url = {
                         executor.submit(
-                            self._downloader.download, url.strip(), self._output_dir
-                        ): url
-                        for url in urls
+                            self._downloader.download, line[0].strip(), self._output_dir
+                        ): line
+                        for line in data
                     }
-                    for future in as_completed(future_to_url):
+                    for idx, future in enumerate(as_completed(future_to_url)):
                         try:
                             audio_file = future.result()
                             if audio_file:
-                                downloaded_files.append(audio_file)
+                                downloaded_files.append(
+                                    (audio_file, data[idx][1].strip())
+                                )
                         except DownloadUrlException as e:
                             logging.error("Error while downloading %s", e)
 
-                urls = []
+                data = []
 
                 if len(downloaded_files) == 0:
                     continue
 
                 logging.info("Tagging %s", len(downloaded_files))
-                tags = self._tagger.tag(downloaded_files)
+                tags = self._tagger.tag([file for file, _ in downloaded_files])
 
                 logging.info("Generating descriptions")
 
                 lst_tags = [
-                    [name.split("/")[-1].replace(".mp3", ""), description]
-                    for name, description in tags.items()
+                    [
+                        values[0].split("/")[-1].replace(".mp3", ""),
+                        values[1],
+                        downloaded_files[idx][1],
+                    ]
+                    for idx, values in enumerate(tags.items())
                 ]
 
                 outputs = self._llm.generate(lst_tags)
