@@ -1,1 +1,1 @@
-from src.generator.process import Process
+from src.generator.llm import LLM
