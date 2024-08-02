@@ -3,6 +3,7 @@ Manager module.
 """
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from tagging.tagger import Tagger
 
@@ -56,7 +57,6 @@ class Manager:
                 filter_data.filter(self._input_file)
 
         with open(self._input_file, "r", encoding="utf-8") as f:
-
             urls = []
             for url in f:
                 urls.append(url)
@@ -64,25 +64,42 @@ class Manager:
                 if len(urls) < self._batch_size:
                     continue
 
+                logging.info("Downloading %s", self._batch_size)
                 downloaded_files = []
-                for url in urls:
-                    print(url)
-                    try:
-                        audio_file = self._downloader.download(
-                            url.strip(), self._output_dir
-                        )
-                        downloaded_files.append(audio_file)
-                    except DownloadUrlException as e:
-                        logging.error(e)
+
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    future_to_url = {
+                        executor.submit(
+                            self._downloader.download, url.strip(), self._output_dir
+                        ): url
+                        for url in urls
+                    }
+                    for future in as_completed(future_to_url):
+                        try:
+                            audio_file = future.result()
+                            if audio_file:
+                                downloaded_files.append(audio_file)
+                        except DownloadUrlException as e:
+                            logging.error("Error while downloading %s", e)
 
                 urls = []
 
-                logging.info("Tagging %s", self._batch_size)
+                if len(downloaded_files) == 0:
+                    continue
+
+                logging.info("Tagging %s", len(downloaded_files))
                 tags = self._tagger.tag(downloaded_files)
 
                 logging.info("Generating descriptions")
-                for path, description in tags.items():
-                    name = path.split("/")[-1].replace(".mp3", "")
-                    out = self._llm.generate(name, description)
 
-                    src.utils.save_prompt(f"{self._output_dir}/{name}.txt", out)
+                lst_tags = [
+                    [name.split("/")[-1].replace(".mp3", ""), description]
+                    for name, description in tags.items()
+                ]
+
+                outputs = self._llm.generate(lst_tags)
+
+                for out in outputs:
+                    src.utils.save_prompt(
+                        f"{self._output_dir}/{out['name']}.txt", out["description"]
+                    )

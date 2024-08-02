@@ -16,7 +16,7 @@ class DownloaderUrl(Downloader):
     DownloaderUrl class.
     """
 
-    def download(self, url: str, output_dir: str, max_chunk: int = 50) -> str:
+    def download(self, url: str, output_dir: str, max_chunk: int = 500) -> str:
         """
         Download the file from the URL.
 
