@@ -3,6 +3,7 @@ Manager module.
 """
 
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from tagging.tagger import Tagger
@@ -10,7 +11,7 @@ from tagging.tagger import Tagger
 import src.utils
 from src.downloader import DownloaderUrl
 from src.exceptions import DownloadUrlException
-from src.filter import DeduplicateFilter
+from src.filter import DeduplicateFilter, SpaceFilter
 from src.generator import LLM
 
 logging.basicConfig(level=logging.INFO)
@@ -35,9 +36,16 @@ class Manager:
             batch_size (int, optional): the batch size. Defaults to 6.
         """
 
-        self.filters = [DeduplicateFilter()]
+        self.filters = [DeduplicateFilter(), SpaceFilter()]
         self._input_file = input_file
+
+        if not os.path.exists(self._input_file):
+            raise FileNotFoundError(f"File {self._input_file} not found")
+
         self._output_dir = output_dir
+
+        if not os.path.exists(self._output_dir):
+            os.makedirs(self._output_dir)
 
         self._tagger = Tagger()
         self._tagger.load_model()
@@ -109,3 +117,12 @@ class Manager:
                     src.utils.save_prompt(
                         f"{self._output_dir}/{out['name']}.txt", out["description"]
                     )
+
+        logging.info("Removing space data")
+        for filter_data in self.filters:
+            if filter_data.type() == "line":
+                for file in os.listdir(self._output_dir):
+                    if file.endswith(".txt"):
+                        filter_data.filter(f"{self._output_dir}/{file}")
+
+        logging.info("Done.")
