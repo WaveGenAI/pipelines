@@ -1,0 +1,7 @@
+requests
+transformers
+essentia
+librosa
+
+
+git+https://github.com/WaveGenAI/tagging.git

@@ -11,10 +11,21 @@ class LLM:
     """
 
     PROMPT = """ 
-    Describe the music with a list of keyword based on information below. Should be the more accurate possible. Don't include timestamp in the description and no-standar character like ':-.'. 
-    Write in one unique line. Write nothing about the audio quality (if word noise, ignore it) and ban this word: "4 on the floor kick". The information provided may contain errors so try to cross-reference the information as much as possible. Don't describe multiple music.
-    Write only tags related to the music split by ",".
-    The music is called \"{name}\". The availabe metatags related to the track are: {metatags}. The full no-accurate description of the music for each slice of 10 seconds is: {clap}. 
+    Describe the music by generating a list of keywords/tags based on information below. Deduct tag with the name of the music, the name of the artist, the genre, the key features of the musics and the bad quality description of the music for each slice of 10 seconds.
+    Be the more accurate as possible.
+    
+    The music is called \"{name}\". 
+    The availabe metatags related to the track are: 
+    {metatags}. 
+    
+    The full no-accurate description of the music for each slice of 10 seconds is: 
+    {clap}. 
+    
+    The features of the music are: 
+    {features}.
+    
+    Write nothing except the tags. Don't include timestamp from the no-accurate description and ignore tags about the audio quality.
+    e.g: Italo disco,  Italo-disco,  1980s, 124BPM, '80s,  virtuoso synthwave,  euro dance, Key F, Chords: Fm, Cm, Bb, Gm
     """
 
     def __init__(self, llm_name: str = "google/gemma-2-2b-it"):
@@ -40,10 +51,12 @@ class LLM:
 
         prompts_list = []
         for tag in tags:
-            name, clap, metatags = tag
+            name, clap, metatags, features = tag
 
-            prompt = self.PROMPT.format(clap=clap, name=name, metatags=metatags).strip()
-
+            prompt = self.PROMPT.format(
+                clap=clap[:1000], name=name, metatags=metatags, features=features
+            ).strip()
+            print(prompt)
             prompt = self._tokenizer.apply_chat_template(
                 [{"role": "user", "content": prompt}],
                 tokenize=False,

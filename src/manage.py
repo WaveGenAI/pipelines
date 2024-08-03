@@ -6,13 +6,14 @@ import logging
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+import soundfile
 from tagging.tagger import Tagger
 
 import src.utils
 from src.downloader import DownloaderUrl
 from src.exceptions import DownloadUrlException
 from src.filter import DeduplicateFilter, SpaceFilter
-from src.generator import LLM
+from src.generator import LLM, FeatureExtractor
 
 logging.basicConfig(level=logging.INFO)
 
@@ -26,14 +27,14 @@ class Manager:
         self,
         input_file: str = "data.txt",
         output_dir: str = "audio",
-        batch_size: int = 6,
+        batch_size: int = 4,
     ):
         """Constructor for the Manager class.
 
         Args:
             input_file (str, optional): the input file that contain url. Defaults to "data.txt".
             output_dir (str, optional): the output directory. Defaults to "audio".
-            batch_size (int, optional): the batch size. Defaults to 6.
+            batch_size (int, optional): the batch size. Defaults to 4.
         """
 
         self.filters = [DeduplicateFilter(), SpaceFilter()]
@@ -54,6 +55,7 @@ class Manager:
         self._batch_size = batch_size
 
         self._downloader = DownloaderUrl()
+        self._feature_extractor = FeatureExtractor()
 
     def run(self) -> None:
         """
@@ -98,19 +100,32 @@ class Manager:
                     continue
 
                 logging.info("Tagging %s", len(downloaded_files))
-                tags = self._tagger.tag([file for file, _ in downloaded_files])
+                try:
+                    tags = self._tagger.tag(
+                        [file for file, _ in downloaded_files], max_batch=10
+                    )
+                except soundfile.LibsndfileError:
+                    logging.error("Error while tagging")
+                    continue
 
-                logging.info("Generating descriptions")
+                logging.info("Generating features")
+
+                features = [
+                    self._feature_extractor.print_features(file)
+                    for file, _ in downloaded_files
+                ]
 
                 lst_tags = [
                     [
                         values[0].split("/")[-1].replace(".mp3", ""),
                         values[1],
                         downloaded_files[idx][1],
+                        features[idx],
                     ]
                     for idx, values in enumerate(tags.items())
                 ]
 
+                logging.info("Generating prompts")
                 outputs = self._llm.generate(lst_tags)
 
                 for out in outputs:
