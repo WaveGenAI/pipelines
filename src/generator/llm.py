@@ -56,7 +56,7 @@ class LLM:
             prompt = self.PROMPT.format(
                 clap=clap[:1000], name=name, metatags=metatags, features=features
             ).strip()
-            print(prompt)
+
             prompt = self._tokenizer.apply_chat_template(
                 [{"role": "user", "content": prompt}],
                 tokenize=False,

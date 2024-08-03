@@ -2,6 +2,6 @@ requests
 transformers
 essentia
 librosa
-
+aiohttp
 
 git+https://github.com/WaveGenAI/tagging.git

@@ -2,10 +2,12 @@
 Script to download a file from a URL
 """
 
+import asyncio
 import logging
 import os
+from typing import List
 
-import requests
+import aiohttp
 
 from src.downloader.downloader import Downloader
 from src.exceptions import DownloadUrlException
@@ -13,50 +15,65 @@ from src.exceptions import DownloadUrlException
 
 class DownloaderUrl(Downloader):
     """
-    DownloaderUrl class.
+    DownloaderUrl class using aiohttp for async downloads.
     """
 
-    def download(self, url: str, output_dir: str, max_chunk: int = 1500) -> str:
+    async def download(self, url: str, output_dir: str, max_chunk: int = 1500) -> None:
         """
-        Download the file from the URL.
+        Download the file from the URL asynchronously.
 
         Args:
             url (str): The URL to download.
             output_dir (str): The output directory.
-            max_chunk (int, optional): The maximum number of chunks to download. Defaults to 100.
-
-        Returns:
-            str: The path to the downloaded file.
+            max_chunk (int, optional): The maximum number of chunks to download. Defaults to 1500.
         """
-
         base_filename = url.split("/")[-1]
 
         try:
-            with requests.get(url, stream=True, timeout=10) as r:
-                r.raise_for_status()
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as r:
+                    if r.status != 200:
+                        raise DownloadUrlException(
+                            f"Failed to download URL: {url} - Status: {r.status}"
+                        )
 
-                # get if content type is audio
-                content_type = r.headers.get("Content-Type")
+                    content_type = r.headers.get("Content-Type")
+                    if content_type is None or "audio" not in content_type:
+                        raise DownloadUrlException(f"Not an audio: {url}")
 
-                if content_type is None or "audio" not in content_type:
-                    raise DownloadUrlException(f"Not an audio: {url}")
+                    if "Content-Length" not in r.headers:
+                        raise DownloadUrlException(f"Content-Length not found: {url}")
 
-                if "Content-Length" not in r.headers:
-                    raise DownloadUrlException(f"Content-Length not found: {url}")
-
-                # if the file is too large (bigger than 5 minutes)
-                if "Content-Length" in r.headers:
                     content_length = int(r.headers["Content-Length"])
                     if content_length > max_chunk * 8192:
                         raise DownloadUrlException(
                             f"File is too large: {content_length} bytes"
                         )
 
-                with open(os.path.join(output_dir, base_filename), "wb") as f:
-                    for chunk in r.iter_content(chunk_size=8192):
-                        f.write(chunk)
+                    file_path = os.path.join(output_dir, base_filename)
+                    with open(file_path, "wb") as f:
+                        while True:
+                            chunk = await r.content.read(8192)
+                            if not chunk:
+                                break
+                            f.write(chunk)
 
-        except requests.exceptions.RequestException as e:
-            raise DownloadUrlException(f"Failed to download URL: {url} - {e}")
+                    logging.info("Downloaded %s", file_path)
+        except DownloadUrlException as e:
+            logging.error(e)
 
-        return os.path.join(output_dir, base_filename)
+    async def download_all(
+        self, urls: List[str], output_dir: str, max_chunk: int = 1500
+    ):
+        """
+        Download multiple files from a list of URLs asynchronously.
+
+        Args:
+            urls (List[str]): List of URLs to download.
+            output_dir (str): The output directory.
+            max_chunk (int, optional): The maximum number of chunks to download. Defaults to 1500.
+        """
+        os.makedirs(output_dir, exist_ok=True)
+
+        tasks = [self.download(url, output_dir, max_chunk) for url in urls]
+        return await asyncio.gather(*tasks)

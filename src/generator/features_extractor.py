@@ -137,7 +137,7 @@ class FeatureExtractor:
         key = self.extract_key(audio_path)
         chords = self.extract_chords(audio_path)
 
-        out_str = f" Tempo: {round(tempo,1)}BPM, \
+        out_str = f"Tempo: {round(tempo,1)}BPM, \
                 Key of the music: {key}, \
                 20 firsts timestamp of Downbeats: {downbeats[:20]}, \
                 20 firsts Chords (2 seconds windows): {chords[:20]}".strip()
