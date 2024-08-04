@@ -28,14 +28,14 @@ class Manager:
         self,
         input_file: str = "data.txt",
         output_dir: str = "audio",
-        batch_size: int = 4,
+        batch_size: int = 2,
     ):
         """Constructor for the Manager class.
 
         Args:
             input_file (str, optional): the input file that contain url. Defaults to "data.txt".
             output_dir (str, optional): the output directory. Defaults to "audio".
-            batch_size (int, optional): the batch size. Defaults to 4.
+            batch_size (int, optional): the batch size. Defaults to 2.
         """
 
         self.filters = [DeduplicateFilter(), SpaceFilter()]
@@ -150,7 +150,7 @@ class Manager:
             if filter_data.type() == "text":
                 filter_data.filter(self._input_file)
 
-        self.download_from_file(self._input_file, max_dl=5000)
+        # self.download_from_file(self._input_file, max_dl=5000)
         self.process_download()
 
         logging.info("Removing space data")

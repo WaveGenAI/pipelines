@@ -54,7 +54,10 @@ class LLM:
             name, clap, metatags, features = tag
 
             prompt = self.PROMPT.format(
-                clap=clap[:1000], name=name, metatags=metatags, features=features
+                clap=clap[:500],
+                name=name[:200],
+                metatags=metatags[:500],
+                features=features,
             ).strip()
 
             prompt = self._tokenizer.apply_chat_template(
