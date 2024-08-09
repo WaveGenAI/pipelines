@@ -150,7 +150,7 @@ class Manager:
             if filter_data.type() == "text":
                 filter_data.filter(self._input_file)
 
-        # self.download_from_file(self._input_file, max_dl=5000)
+        self.download_from_file(self._input_file, max_dl=200_000)
         self.process_download()
 
         logging.info("Removing space data")
