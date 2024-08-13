@@ -31,6 +31,7 @@ class Manager:
         batch_size: int = 2,
         llm: bool = False,
         transcript: bool = False,
+        download: bool = True,
     ):
         """Constructor for the Manager class.
 
@@ -40,6 +41,7 @@ class Manager:
             batch_size (int, optional): the batch size. Defaults to 2.
             llm (bool, optional): Use the llm to generate the description. Defaults to False.
             transcript (bool, optional): Use the transcript to generate the description. Defaults to False.
+            download (bool, optional): Download the audio files. Defaults to True.
         """
 
         self.filters = [DeduplicateFilter(), SpaceFilter()]
@@ -188,13 +190,13 @@ class Manager:
             if len(batch_files) < self._batch_size and file != downloaded_files[-1]:
                 continue
 
+            if self._transcript:
+                self.construct_lyric(batch_files)
+
             if self._use_llm:
                 self._construct_prompt_llm(batch_files)
             else:
                 self.construct_prompt(batch_files)
-
-            if self._transcript:
-                self.construct_lyric(batch_files)
 
             batch_files = []
 
@@ -207,7 +209,9 @@ class Manager:
             if filter_data.type() == "text":
                 filter_data.filter(self._input_file)
 
-        self.download_from_file(self._input_file, max_dl=200_000, batch_dl=400)
+        if self._downloader:
+            self.download_from_file(self._input_file, batch_dl=400)
+
         self.process_download()
 
         logging.info("Removing space data")
