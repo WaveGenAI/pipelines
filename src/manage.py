@@ -5,14 +5,14 @@ Manager module.
 import asyncio
 import logging
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import re
 
 import soundfile
+from lyric_whisper import LyricGen
 from tagging.tagger import Tagger
 
 import src.utils
 from src.downloader import DownloaderUrl
-from src.exceptions import DownloadUrlException
 from src.filter import DeduplicateFilter, SpaceFilter
 from src.generator import LLM, FeatureExtractor
 
@@ -29,6 +29,8 @@ class Manager:
         input_file: str = "data.txt",
         output_dir: str = "audio",
         batch_size: int = 2,
+        llm: bool = False,
+        transcript: bool = False,
     ):
         """Constructor for the Manager class.
 
@@ -36,6 +38,8 @@ class Manager:
             input_file (str, optional): the input file that contain url. Defaults to "data.txt".
             output_dir (str, optional): the output directory. Defaults to "audio".
             batch_size (int, optional): the batch size. Defaults to 2.
+            llm (bool, optional): Use the llm to generate the description. Defaults to False.
+            transcript (bool, optional): Use the transcript to generate the description. Defaults to False.
         """
 
         self.filters = [DeduplicateFilter(), SpaceFilter()]
@@ -49,11 +53,18 @@ class Manager:
         if not os.path.exists(self._output_dir):
             os.makedirs(self._output_dir)
 
-        self._tagger = Tagger()
-        self._tagger.load_model()
-
-        self._llm = LLM()
+        self._use_llm = llm
         self._batch_size = batch_size
+
+        if llm:
+            self._tagger = Tagger()
+            self._tagger.load_model()
+            self._llm = LLM()
+
+        self._transcript = transcript
+
+        if transcript:
+            self._lyric_gen = LyricGen()
 
         self._downloader = DownloaderUrl()
         self._feature_extractor = FeatureExtractor()
@@ -84,6 +95,75 @@ class Manager:
                 if max_dl > 0 and len(os.listdir(self._output_dir)) >= max_dl:
                     break
 
+    def _construct_prompt_llm(self, batch: list) -> None:
+        """Construct the prompt with llm.
+
+        Args:
+            batch (list): the batch of files.
+        """
+        logging.info("Tagging %s", len(batch))
+        try:
+            tags = self._tagger.tag([file for file, _ in batch], max_batch=3)
+        except soundfile.LibsndfileError:
+            logging.error("Error while tagging")
+            return
+
+        logging.info("Generating features")
+
+        features = [self._feature_extractor.print_features(file) for file, _ in batch]
+
+        inputs = [
+            [
+                values[0].split("/")[-1].replace(".mp3", ""),
+                values[1],
+                batch[idx][1],
+                features[idx],
+            ]
+            for idx, values in enumerate(tags.items())
+        ]
+
+        logging.info("Generating prompts")
+        outputs = self._llm.generate(inputs)
+
+        for out in outputs:
+            src.utils.save_prompt(
+                f"{self._output_dir}/{out['name']}_descr.txt", out["description"]
+            )
+
+    def construct_prompt(self, batch: list) -> None:
+        """Construct the prompt with llm
+
+        Args:
+            batch (list): the batch of files.
+        """
+
+        for file, metadatas in batch:
+            name = file.split("/")[-1].replace(".mp3", "")
+            metadatas = f"name: {name}, {metadatas}"
+
+            # remove all word that end with :
+            regex = r"\b\w+:\s"
+            metadatas = re.sub(regex, "", metadatas)
+
+            metadatas = src.utils.shuffle_list(metadatas.split(","))
+            metadatas = ", ".join(metadatas)
+
+            src.utils.save_prompt(f"{self._output_dir}/{name}_descr.txt", metadatas)
+
+    def construct_lyric(self, batch: list) -> None:
+        """Construct the prompt with lyric.
+
+        Args:
+            batch (list): the batch of files.
+        """
+
+        for file, _ in batch:
+            name = file.split("/")[-1].replace(".mp3", "")
+            prob_lyrics, lyrics = self._lyric_gen.generate_lyrics(file)
+
+            if prob_lyrics > 0.5:
+                src.utils.save_prompt(f"{self._output_dir}/{name}_lyric.txt", lyrics)
+
     def process_download(self) -> None:
         """Method to process the downloaded files."""
 
@@ -108,36 +188,13 @@ class Manager:
             if len(batch_files) < self._batch_size and file != downloaded_files[-1]:
                 continue
 
-            logging.info("Tagging %s", len(batch_files))
-            try:
-                tags = self._tagger.tag([file for file, _ in batch_files], max_batch=3)
-            except soundfile.LibsndfileError:
-                logging.error("Error while tagging")
-                continue
+            if self._use_llm:
+                self._construct_prompt_llm(batch_files)
+            else:
+                self.construct_prompt(batch_files)
 
-            logging.info("Generating features")
-
-            features = [
-                self._feature_extractor.print_features(file) for file, _ in batch_files
-            ]
-
-            inputs = [
-                [
-                    values[0].split("/")[-1].replace(".mp3", ""),
-                    values[1],
-                    batch_files[idx][1],
-                    features[idx],
-                ]
-                for idx, values in enumerate(tags.items())
-            ]
-
-            logging.info("Generating prompts")
-            outputs = self._llm.generate(inputs)
-
-            for out in outputs:
-                src.utils.save_prompt(
-                    f"{self._output_dir}/{out['name']}.txt", out["description"]
-                )
+            if self._transcript:
+                self.construct_lyric(batch_files)
 
             batch_files = []
 
@@ -150,7 +207,7 @@ class Manager:
             if filter_data.type() == "text":
                 filter_data.filter(self._input_file)
 
-        self.download_from_file(self._input_file, max_dl=200_000)
+        self.download_from_file(self._input_file, max_dl=200_000, batch_dl=400)
         self.process_download()
 
         logging.info("Removing space data")

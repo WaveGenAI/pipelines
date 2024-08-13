@@ -5,3 +5,4 @@ librosa
 aiohttp
 
 git+https://github.com/WaveGenAI/tagging.git
+git+https://github.com/WaveGenAI/lyrics.git
