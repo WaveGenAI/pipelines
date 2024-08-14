@@ -3,6 +3,9 @@ transformers
 essentia
 librosa
 aiohttp
+asks
+trio
+webdataset
 
 git+https://github.com/WaveGenAI/tagging.git
 git+https://github.com/WaveGenAI/lyrics.git
