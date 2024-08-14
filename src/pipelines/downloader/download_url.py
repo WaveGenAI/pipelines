@@ -30,10 +30,14 @@ class DownloaderUrl(Downloader):
 
         async def grabber(s, path):
             try:
-                response = await s.get(path, stream=True, timeout=5)
+                response = await s.get(path, stream=True)
 
                 if response.status_code == 200:
                     # get file size
+                    if "Content-Length" not in response.headers:
+                        logging.error("No Content-Length: %s", path)
+                        return
+
                     size = int(response.headers["Content-Length"])
 
                     # if bigger than 10MB, skip

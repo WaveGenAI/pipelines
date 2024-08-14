@@ -6,6 +6,7 @@ aiohttp
 asks
 trio
 webdataset
+tf-keras
 
 git+https://github.com/WaveGenAI/tagging.git
 git+https://github.com/WaveGenAI/lyrics.git

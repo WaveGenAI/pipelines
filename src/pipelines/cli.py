@@ -3,8 +3,11 @@ import logging
 import os
 import tempfile
 
+import torch
+import torchaudio
 import webdataset as wds
-from downloader.download_url import DownloaderUrl
+from datasets import Audio, load_dataset
+from downloader import DownloaderUrl
 from lyric_whisper import LyricGen
 
 logging.basicConfig(
@@ -14,8 +17,11 @@ logging.basicConfig(
 )
 
 # CONSTANTS
-BATCH_DL_URLS = 1000
+BATCH_DL_URLS = 500
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+SAMPLE_RATE = 44100
 
+# ARGUMENTS
 parser = argparse.ArgumentParser()
 parser.add_argument("--input", help="input file path", default="../../musics.xml")
 parser.add_argument(
@@ -54,6 +60,7 @@ if args.download:
                         [url for url, _, _ in batch_urls], tmpdirname
                     )
 
+                    idx = 0
                     for url, metatags, name in batch_urls:
                         file_path = os.path.join(tmpdirname, url.split("/")[-1])
 
@@ -61,15 +68,18 @@ if args.download:
                         if not os.path.exists(file_path):
                             continue
 
+                        idx_str = f"{idx:06d}"
+                        idx += 1
+
                         with open(file_path, "rb") as audio_file:
                             tar_writer.write(
                                 {
-                                    "__key__": name,
+                                    "__key__": idx_str,
                                     "wav": audio_file.read(),
                                     "txt": metatags.encode("utf-8"),
                                 }
                             )
-                        logging.info("Saved to tar: %s", name)
+                        logging.info("Saved to tar: %s", idx_str)
 
                         # remove downloaded audio file
                         os.remove(file_path)
@@ -84,17 +94,64 @@ if args.download:
             [url for url, _, _ in batch_urls], args.output
         )
 
-        # Sauvegarder les fichiers restants dans le tarball
+        idx = 0
         for (url, metatags, name), file_path in zip(batch_urls, downloaded_files):
             with open(file_path, "rb") as audio_file:
+                # fill idx with zeros
+                idx_str = f"{idx:06d}"
+                idx += 1
+
                 tar_writer.write(
                     {
-                        "__key__": name,
+                        "__key__": idx_str,
                         "wav": audio_file.read(),
                         "txt": metatags.encode("utf-8"),
                     }
                 )
-            logging.info("Saved to tar: %s", name)
 
-    # Fermer le writer à la fin
+            logging.info("Saved to tar: %s", idx_str)
+
     tar_writer.close()
+
+# load dataset with huggingface datasets library
+path = os.path.join(args.output, "*.tar")
+dataset = load_dataset("webdataset", data_files=path, streaming=False)
+
+# cast audio with huggingface datasets
+dataset = dataset.cast_column("wav", Audio(sampling_rate=SAMPLE_RATE, mono=False))
+
+# rename columns
+dataset = dataset.rename_column("wav", "audio")
+dataset = dataset.rename_column("txt", "metatags")
+
+# drop columns
+dataset = dataset.remove_columns(["__key__", "__url__"])
+
+asr = LyricGen()
+
+
+def prepare_dataset(batch):
+    audio = batch["audio"].copy()
+    audio = torch.tensor(audio["array"]).to(torch.float32)
+
+    # load audio from array
+    audio = torchaudio.transforms.Resample(SAMPLE_RATE, 16000)(audio)
+
+    # convert to mono
+    audio = audio.mean(0, keepdim=True)
+
+    # generate lyrics
+    prob, text = asr.generate_lyrics(audio[0])
+
+    if prob < 0.5:
+        text = ""
+
+    batch["lyric"] = text
+    return batch
+
+
+dataset = dataset.map(prepare_dataset)
+
+for data in dataset["train"]:
+    print(data)
+    break
