@@ -1,14 +1,16 @@
 import argparse
+import io
 import logging
 import os
 import tempfile
 
+import braceexpand
 import torch
 import torchaudio
 import webdataset as wds
-from datasets import Audio, load_dataset
 from downloader import DownloaderUrl
-from lyric_whisper import LyricGen
+from silero_vad import get_speech_timestamps, load_silero_vad
+from transformers import pipeline
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,7 +25,7 @@ SAMPLE_RATE = 44100
 
 # ARGUMENTS
 parser = argparse.ArgumentParser()
-parser.add_argument("--input", help="input file path", default="../../musics.xml")
+parser.add_argument("--input", help="input file path", default="musics.xml")
 parser.add_argument(
     "--output", help="output directory path", default="/media/works/audio_v2/"
 )
@@ -113,45 +115,71 @@ if args.download:
 
     tar_writer.close()
 
-# load dataset with huggingface datasets library
-path = os.path.join(args.output, "*.tar")
-dataset = load_dataset("webdataset", data_files=path, streaming=False)
 
-# cast audio with huggingface datasets
-dataset = dataset.cast_column("wav", Audio(sampling_rate=SAMPLE_RATE, mono=False))
+num_tar_files = len(os.listdir("/media/works/audio_v2/"))
+dataset_path = os.path.join(args.output, f"dataset-{{000000..{num_tar_files - 1}}}.tar")
+urls = braceexpand.braceexpand(dataset_path)
 
-# rename columns
-dataset = dataset.rename_column("wav", "audio")
-dataset = dataset.rename_column("txt", "metatags")
-
-# drop columns
-dataset = dataset.remove_columns(["__key__", "__url__"])
-
-asr = LyricGen()
+dataset = wds.WebDataset(urls)
 
 
-def prepare_dataset(batch):
-    audio = batch["audio"].copy()
-    audio = torch.tensor(audio["array"]).to(torch.float32)
+def resample_audio(sample: dict):
+    audio_data, sr = torchaudio.load(io.BytesIO(sample["wav"]))
 
-    # load audio from array
-    audio = torchaudio.transforms.Resample(SAMPLE_RATE, 16000)(audio)
+    if sr != SAMPLE_RATE:
+        audio_data = torchaudio.transforms.Resample(orig_freq=sr, new_freq=SAMPLE_RATE)(
+            audio_data
+        )
+
+    sample["wav"] = audio_data
+    return sample
+
+
+# resample audio
+dataset = dataset.map(resample_audio)
+
+
+vad = load_silero_vad()
+vad.to(DEVICE)
+asr = pipeline(
+    "automatic-speech-recognition",
+    "distil-whisper/distil-large-v3",
+    device=DEVICE,
+    torch_dtype=torch.float16,
+)
+
+
+# transcribe audio
+def transcribe_audio(sample: dict):
+    audio_data = sample["wav"]
+    sample["lyrics"] = ""
 
     # convert to mono
-    audio = audio.mean(0, keepdim=True)
+    if audio_data.shape[0] > 1:
+        audio_data = torch.mean(audio_data, dim=0, keepdim=False)
 
-    # generate lyrics
-    prob, text = asr.generate_lyrics(audio[0])
+    audio_data = audio_data.to(DEVICE)
 
-    if prob < 0.5:
-        text = ""
+    # get speech timestamps
+    speech_timestamps = get_speech_timestamps(audio_data, vad)
 
-    batch["lyric"] = text
-    return batch
+    if len(speech_timestamps) < 3:
+        return sample
+
+    outputs = asr(
+        audio_data.cpu().numpy(),
+        chunk_length_s=30,
+        batch_size=10,
+        return_timestamps=False,
+    )
+
+    sample["lyrics"] = outputs["text"].strip()
+
+    return sample
 
 
-dataset = dataset.map(prepare_dataset)
+dataset = dataset.map(transcribe_audio)
 
-for data in dataset["train"]:
-    print(data)
-    break
+for sample in dataset:
+    print(sample)
+    pass
