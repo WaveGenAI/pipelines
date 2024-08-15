@@ -2,8 +2,11 @@ import argparse
 import logging
 import os
 
+import librosa
+import numpy as np
 import torch
 from downloader import DownloaderUrl
+from panns_inference import AudioTagging, labels
 from transformers import pipeline
 
 logging.basicConfig(
@@ -14,8 +17,6 @@ logging.basicConfig(
 
 # CONSTANTS
 BATCH_DL_URLS = 500
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-SAMPLE_RATE = 44100
 
 # ARGUMENTS
 parser = argparse.ArgumentParser()
@@ -63,12 +64,13 @@ if args.download:
                     with open(base_path + "_descr.txt", "w", encoding="utf-8") as f:
                         f.write(metatags)
 
+
 if args.transcript:
     # Initialize ASR model
     asr = pipeline(
         "automatic-speech-recognition",
         "distil-whisper/distil-large-v3",
-        device=DEVICE,
+        device_map="auto",
         torch_dtype=torch.float16,
     )
 
@@ -77,6 +79,23 @@ if args.transcript:
             continue
 
         audio_path = os.path.join(args.output, audio_file)
+
+        (audio, _) = librosa.core.load(audio_path, sr=32000, mono=True)
+        audio = audio[None, :]
+
+        at = AudioTagging(checkpoint_path=None, device="cuda")
+        (clipwise_output, embedding) = at.inference(audio)
+
+        sorted_indexes = np.argsort(clipwise_output[0])[::-1]
+
+        speech = False
+        for k in range(10):
+            if np.array(labels)[sorted_indexes[k]].lower() == "speech":
+                if clipwise_output[0][sorted_indexes[k]] > 0.5:
+                    speech = True
+
+        if not speech:  # Skip if no speech detected
+            continue
 
         # Transcribe audio
         transcript = asr(audio_path, chunk_length_s=30, batch_size=10)
