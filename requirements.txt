@@ -5,10 +5,7 @@ librosa
 aiohttp
 asks
 trio
-webdataset
-tf-keras
-silero-vad
-flash-attn
+anyio[trio]
 
 git+https://github.com/WaveGenAI/tagging.git
 git+https://github.com/WaveGenAI/lyrics.git
