@@ -3,6 +3,7 @@ Abstract class for downloading data from the internet.
 """
 
 import abc
+from typing import List
 
 
 class Downloader(abc.ABC):
@@ -11,15 +12,15 @@ class Downloader(abc.ABC):
     """
 
     @abc.abstractmethod
-    def download(self, url: str, output_dir: str) -> str:
+    def download_all(self, urls: List[str], output_dir: str) -> None:
         """
         Download the data from the internet.
 
         Args:
-            url (str): The url to download.
+            urls (List[str]): List of URLs to download.
             output_dir (str): The output directory.
 
         Returns:
-            str: The path to the downloaded file.
+            None
         """
         raise NotImplementedError
