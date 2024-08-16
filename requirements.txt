@@ -6,6 +6,7 @@ aiohttp
 asks
 trio
 anyio[trio]
+panns_inference
 
 git+https://github.com/WaveGenAI/tagging.git
 git+https://github.com/WaveGenAI/lyrics.git

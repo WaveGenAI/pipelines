@@ -88,20 +88,25 @@ if args.transcript:
 
         sorted_indexes = np.argsort(clipwise_output[0])[::-1]
 
+        lyrics = ""
+
         speech = False
         for k in range(10):
             if np.array(labels)[sorted_indexes[k]].lower() == "speech":
                 if clipwise_output[0][sorted_indexes[k]] > 0.5:
                     speech = True
+                    break
 
-        if not speech:  # Skip if no speech detected
-            continue
+        if speech:  # Skip if no speech detected
+            # Transcribe audio
+            transcript = asr(
+                audio_path, chunk_length_s=30, batch_size=10, return_timestamps=True
+            )
 
-        # Transcribe audio
-        transcript = asr(audio_path, chunk_length_s=30, batch_size=10)
+            lyrics = transcript["text"]
 
         # Write transcript
         with open(
             audio_path.rsplit(".")[0] + "_transcript.txt", "w", encoding="utf-8"
         ) as f:
-            f.write(transcript["text"])
+            f.write(lyrics.strip())
