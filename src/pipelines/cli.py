@@ -64,6 +64,7 @@ if args.download:
                     with open(base_path + "_descr.txt", "w", encoding="utf-8") as f:
                         f.write(metatags)
 
+                batch_urls = []
 
 if args.transcript:
     # Initialize ASR model
