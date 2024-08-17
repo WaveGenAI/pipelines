@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import random
 
 import librosa
 import numpy as np
@@ -41,27 +42,34 @@ if args.download:
     with open(args.input, "r", encoding="utf-8") as f:
         for line in f.readlines():
             urls, metatags = line.rsplit(";", 1)
-            name = urls.split("/")[-1].strip()
             urls = urls.strip()
             metatags = metatags.strip()
 
+            # create random id to name the file (fill with 0 if smaller than 10)
+            file_idx = str(random.randint(0, 10**10)).zfill(10)
+            while os.path.exists(os.path.join(args.output, file_idx + ".mp3")):
+                file_idx = str(random.randint(0, 10**10)).zfill(10)
+
             # stack urls while not reaching the limit
-            batch_urls.append((urls, metatags, name))
+            batch_urls.append((urls, metatags, file_idx))
 
             if len(batch_urls) == BATCH_DL_URLS:
-                downloader.download_all([url for url, _, _ in batch_urls], args.output)
+                downloader.download_all(batch_urls, args.output)
 
-                for url, metatags, name in batch_urls:
-                    file_path = os.path.join(args.output, url.split("/")[-1])
+                for url, metatags, file_idx in batch_urls:
+                    file_path = os.path.join(args.output, file_idx + ".mp3")
 
                     # skip if file not found (error during download)
                     if not os.path.exists(file_path):
                         continue
 
-                    base_path = file_path.rsplit(".")[0]
-
+                    os.path.join(args.output, file_idx + "_descr.txt")
                     # write metatags
-                    with open(base_path + "_descr.txt", "w", encoding="utf-8") as f:
+                    with open(
+                        os.path.join(args.output, file_idx + "_descr.txt"),
+                        "w",
+                        encoding="utf-8",
+                    ) as f:
                         f.write(metatags)
 
                 batch_urls = []
@@ -75,30 +83,39 @@ if args.transcript:
         torch_dtype=torch.float16,
     )
 
+    audio_tagging = AudioTagging(checkpoint_path=None, device="cuda")
+
     for audio_file in os.listdir(args.output):
         if not audio_file.endswith(".mp3"):
             continue
 
         audio_path = os.path.join(args.output, audio_file)
+        try:
+            (audio, _) = librosa.core.load(audio_path, sr=32000, mono=True)
+        except Exception as e:
+            logging.error(f"Error: {e}")
+            continue
 
-        (audio, _) = librosa.core.load(audio_path, sr=32000, mono=True)
         audio = audio[None, :]
 
-        at = AudioTagging(checkpoint_path=None, device="cuda")
-        (clipwise_output, embedding) = at.inference(audio)
+        try:
+            (clipwise_output, embedding) = audio_tagging.inference(audio)
+        except RuntimeError as e:
+            logging.error(f"Error: {e}")
+            continue
 
         sorted_indexes = np.argsort(clipwise_output[0])[::-1]
 
         lyrics = ""
-
         speech = False
         for k in range(10):
             if np.array(labels)[sorted_indexes[k]].lower() == "speech":
-                if clipwise_output[0][sorted_indexes[k]] > 0.5:
+                if clipwise_output[0][sorted_indexes[k]] >= 0.5:
                     speech = True
                     break
 
-        if speech:  # Skip if no speech detected
+        if speech:  # Transcript if no speech detected
+            logging.info(f"Audio found in {audio_file}")
             # Transcribe audio
             transcript = asr(
                 audio_path, chunk_length_s=30, batch_size=10, return_timestamps=True
@@ -111,3 +128,5 @@ if args.transcript:
             audio_path.rsplit(".")[0] + "_transcript.txt", "w", encoding="utf-8"
         ) as f:
             f.write(lyrics.strip())
+
+        logging.info(f"Transcripted {audio_file}")
