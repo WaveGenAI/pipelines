@@ -3,12 +3,10 @@ import logging
 import os
 import random
 
-import librosa
 import numpy as np
-import torch
 from downloader import DownloaderUrl
-from panns_inference import AudioTagging, labels
-from transformers import pipeline
+from faster_whisper import WhisperModel
+from utils import *
 
 logging.basicConfig(
     level=logging.INFO,
@@ -18,6 +16,7 @@ logging.basicConfig(
 
 # CONSTANTS
 BATCH_DL_URLS = 500
+TRANSCRIPT_THRESHOLD = 0.6
 
 # ARGUMENTS
 parser = argparse.ArgumentParser()
@@ -76,52 +75,41 @@ if args.download:
 
 if args.transcript:
     # Initialize ASR model
-    asr = pipeline(
-        "automatic-speech-recognition",
-        "distil-whisper/distil-large-v3",
-        device_map="auto",
-        torch_dtype=torch.float16,
-    )
-
-    audio_tagging = AudioTagging(checkpoint_path=None, device="cuda")
+    model = WhisperModel("distil-large-v3", device="cuda", compute_type="float16")
 
     for audio_file in os.listdir(args.output):
         if not audio_file.endswith(".mp3"):
             continue
 
         audio_path = os.path.join(args.output, audio_file)
-        try:
-            (audio, _) = librosa.core.load(audio_path, sr=32000, mono=True)
-        except Exception as e:
-            logging.error(f"Error: {e}")
-            continue
 
-        audio = audio[None, :]
+        # Transcribe audio file
+        segments, info = model.transcribe(audio_path, beam_size=5)
 
-        try:
-            (clipwise_output, embedding) = audio_tagging.inference(audio)
-        except RuntimeError as e:
-            logging.error(f"Error: {e}")
-            continue
-
-        sorted_indexes = np.argsort(clipwise_output[0])[::-1]
-
+        probs = []
         lyrics = ""
-        speech = False
-        for k in range(10):
-            if np.array(labels)[sorted_indexes[k]].lower() == "speech":
-                if clipwise_output[0][sorted_indexes[k]] >= 0.5:
-                    speech = True
-                    break
 
-        if speech:  # Transcript if no speech detected
-            logging.info(f"Audio found in {audio_file}")
-            # Transcribe audio
-            transcript = asr(
-                audio_path, chunk_length_s=30, batch_size=10, return_timestamps=True
-            )
+        for segment in segments:
+            probs.append(segment.avg_logprob)
 
-            lyrics = transcript["text"]
+            if (
+                np.exp(sum(probs) / len(probs)) < TRANSCRIPT_THRESHOLD
+                and len(probs) > 5
+            ):
+                break
+
+            lyrics += segment.text.strip() + "\n"
+
+        if np.exp(sum(probs) / len(probs)) < TRANSCRIPT_THRESHOLD and len(probs) > 5:
+            logging.warning("Low average logprob: %s", audio_file)
+            lyrics = ""
+
+        if evaluate_split_line(lyrics.strip()) < 4:
+            logging.warning("Too short: %s", audio_file)
+            lyrics = ""
+
+        if lyrics != "":
+            logging.info("Lyrics: %s", lyrics.strip())
 
         # Write transcript
         with open(
@@ -129,4 +117,4 @@ if args.transcript:
         ) as f:
             f.write(lyrics.strip())
 
-        logging.info(f"Transcripted {audio_file}")
+        logging.info("Transcripted %s", audio_file)
