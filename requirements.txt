@@ -6,6 +6,8 @@ aiohttp
 asks
 trio
 anyio[trio]
+ray
+ray[data]
 
 faster-whisper @ https://github.com/SYSTRAN/faster-whisper/archive/refs/heads/master.tar.gz
 
