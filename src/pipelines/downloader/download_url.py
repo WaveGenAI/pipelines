@@ -7,6 +7,7 @@ import os
 from typing import List
 
 import asks
+import librosa
 import trio
 from asks.sessions import Session
 
@@ -55,8 +56,8 @@ class DownloaderUrl(Downloader):
 
                     size = int(response.headers["Content-Length"])
 
-                    # if bigger than 10MB, skip
-                    if size > 10 * 1024 * 1024:
+                    # if bigger than 10MB or less than 5KB, skip
+                    if (size > 10 * 1024 * 1024) or (size < 0.2 * 1024):
                         logging.error("File too big: %s", url)
                         dl_file = False
 
@@ -64,6 +65,15 @@ class DownloaderUrl(Downloader):
                         with open(os.path.join(output_dir, path), "wb") as f:
                             async for chunk in response.body(timeout=5):
                                 f.write(chunk)
+
+                        # resample to 48kHz
+                        y, sr = librosa.load(os.path.join(output_dir, path))
+
+                        if sr > 48000:
+                            y = librosa.resample(y, sr, 48000)
+                            librosa.output.write_wav(
+                                os.path.join(output_dir, path), y, 48000
+                            )
 
                         with open(
                             os.path.join(output_dir, path[:-4] + "_descr.txt"),

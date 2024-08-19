@@ -1,1 +1,1 @@
-from pipelines.transcript.utils import *
+from .transcript.utils import *
