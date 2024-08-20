@@ -3,16 +3,13 @@ import logging
 import os
 import random
 
-from downloader import DownloaderUrl
+from pipelines.downloader.download_url import DownloaderUrl
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler()],
 )
-
-# CONSTANTS
-BATCH_DL_URLS = 500
 
 # ARGUMENTS
 parser = argparse.ArgumentParser()

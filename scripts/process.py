@@ -14,7 +14,7 @@ logging.basicConfig(
 # ARGUMENTS
 parser = argparse.ArgumentParser()
 parser.add_argument(
-    "--output", help="output directory path", default="/media/works/audio_v2/"
+    "--output", help="output directory path", default="/media/works/audio_v3/"
 )
 parser.add_argument(
     "--workers", type=int, default=4, help="number of threads to use for transcription"
@@ -26,13 +26,17 @@ model = TranscriptModel()
 
 def process_audio_file(audio_file):
     if not audio_file.endswith(".mp3"):
-        return None
+        return
 
     audio_path = os.path.join(args.output, audio_file)
+    output_path = audio_path.rsplit(".", 1)[0] + "_transcript.txt"
+    if os.path.exists(output_path):
+        logging.info("Already processed %s", audio_file)
+        return
+
     lyrics = model.transcript(audio_path)
 
     # Write transcript
-    output_path = audio_path.rsplit(".", 1)[0] + "_transcript.txt"
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(lyrics.strip())
 

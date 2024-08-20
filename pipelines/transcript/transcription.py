@@ -13,7 +13,7 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()],
 )
 
-TRANSCRIPT_THRESHOLD = 0.4
+TRANSCRIPT_THRESHOLD = 0.6
 CMD = """ 
 export LD_LIBRARY_PATH=`python3 -c 'import os; import nvidia.cublas.lib; import nvidia.cudnn.lib; import torch; print(os.path.dirname(nvidia.cublas.lib.__file__) + ":" + os.path.dirname(nvidia.cudnn.lib.__file__) + ":" + os.path.dirname(torch.__file__) +"/lib")'`
 """.strip()
@@ -74,14 +74,14 @@ class TranscriptModel:
             logging.warning("Low average logprob: %s", audio_path)
             lyrics = ""
 
+        lyrics = compact_repetitions(lyrics)
+
         if len(lyrics) < 150 and len(lyrics) > 0:
             logging.warning("Short lyrics: %s", audio_path)
             lyrics = ""
 
-        lyrics = compact_repetitions(lyrics)
-
         if lyrics != "":
-            logging.info("Lyrics: %s", lyrics.strip())
+            logging.info("Lyrics: \n%s", lyrics.strip())
             logging.info(
                 "Language probability: %s", self.calculate_logprob(probs, language_prob)
             )

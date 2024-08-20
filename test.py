@@ -1,7 +1,7 @@
 from src.pipelines.transcript.transcription import TranscriptModel
 
 AUDIO_PATH = """ 
-/home/jourdelune/Téléchargements/test8d.mp3
+/media/works/audio_v2/1736967003.mp3
 """.strip()
 
 model = TranscriptModel()
