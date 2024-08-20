@@ -28,7 +28,9 @@ class TranscriptModel:
 
     def __init__(self) -> None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.model = WhisperModel("large-v3", device=device)
+        self.model = WhisperModel(
+            "large-v3", device=device, compute_type="int8_float16"
+        )
 
     def calculate_logprob(self, lst_prob: list, language_prob: float) -> float:
         """
@@ -37,21 +39,20 @@ class TranscriptModel:
 
         return np.exp(sum(lst_prob) / (len(lst_prob) + 0.000000001)) * language_prob
 
-    def transcript(self, audio_path: str) -> None | str:
+    def transcript(self, audio: str) -> None | str:
         """Transcribe audio file.
 
         Args:
-            audio_path (str): the path to the audio file
-
+            audio_path (str): the audio file
         Returns:
             None | str: the transcribed text
         """
 
         try:
             # Transcribe audio file
-            segments, info = self.model.transcribe(audio_path, beam_size=5)
+            segments, info = self.model.transcribe(audio, beam_size=5)
         except Exception as e:
-            logging.error("Error transcribing %s: %s", audio_path, e)
+            logging.error("Error transcribing %s: %s", audio, e)
             return
 
         language_prob = info.language_probability
@@ -71,13 +72,13 @@ class TranscriptModel:
                 lyrics += segment.text.strip() + "\n"
 
         if self.calculate_logprob(probs, language_prob) < TRANSCRIPT_THRESHOLD:
-            logging.warning("Low average logprob: %s", audio_path)
+            logging.warning("Low average logprob: %s", audio)
             lyrics = ""
 
         lyrics = compact_repetitions(lyrics)
 
         if len(lyrics) < 150 and len(lyrics) > 0:
-            logging.warning("Short lyrics: %s", audio_path)
+            logging.warning("Short lyrics: %s", audio)
             lyrics = ""
 
         if lyrics != "":
