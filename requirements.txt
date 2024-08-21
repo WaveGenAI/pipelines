@@ -10,6 +10,7 @@ ray
 ray[data]
 descript-audio-codec
 eyed3
+datasets
 
 faster-whisper @ https://github.com/SYSTRAN/faster-whisper/archive/refs/heads/master.tar.gz
 git+https://github.com/descriptinc/audiotools
