@@ -9,13 +9,10 @@ anyio[trio]
 ray
 ray[data]
 descript-audio-codec
+eyed3
 
 faster-whisper @ https://github.com/SYSTRAN/faster-whisper/archive/refs/heads/master.tar.gz
 git+https://github.com/descriptinc/audiotools
 
 torch==2.3.1
 torchaudio==2.3.1
-
-git+https://github.com/WaveGenAI/tagging.git
-git+https://github.com/WaveGenAI/lyrics.git
-

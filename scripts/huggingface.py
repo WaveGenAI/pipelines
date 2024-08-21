@@ -1,34 +1,36 @@
+import argparse
+import logging
 import os
 
-from datasets import Audio, Dataset
-import argparse
-
+import eyed3
+from datasets import Audio, load_dataset
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--folder", help="folder path", default="/media/works/audio_v3")
+parser.add_argument("--folder", help="folder path", default="/media/works/test/")
 args = parser.parse_args()
 
-audio_files = []
-descriptions = []
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler()],
+)
 
-for file_name in os.listdir(args.folder):
-    if file_name.endswith(".mp3"):
-        if not os.path.exists(
-            os.path.join(args.folder, file_name.replace(".mp3", "_descr.txt"))
-        ):
-            continue
+# Remove invalid audio files
+for audio_file in os.listdir(args.folder):
+    if not audio_file.endswith(".mp3"):
+        continue
 
-        audio_files.append(os.path.join(args.folder, file_name))
-        description_file = file_name.replace(".mp3", "_descr.txt")
-        with open(
-            os.path.join(args.folder, description_file), "r", encoding="utf-8"
-        ) as desc_file:
-            descriptions.append(desc_file.read())
+    path = os.path.join(args.folder, audio_file)
+    file = eyed3.load(path)
 
-data = {"audio": audio_files, "description": descriptions}
-dataset = Dataset.from_dict(data)
+    if file is None:
+        logging.warning("Error processing audio file %s", audio_file)
+        os.remove(os.path.join(args.folder, audio_file))
 
-dataset = dataset.cast_column("audio", Audio(mono=False, decode=False))
+dataset = load_dataset("audiofolder", data_dir=args.folder)
+dataset = load_dataset("audiofolder", data_dir=args.folder).cast_column(
+    "audio", Audio(mono=False, sampling_rate=44100)
+)
 
-dataset.push_to_hub("Jour/audio")
-print(dataset)
+# push the dataset to hub
+dataset.push_to_hub("WaveGenAI/audios")

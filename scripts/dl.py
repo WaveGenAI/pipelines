@@ -2,7 +2,7 @@ import argparse
 import logging
 import os
 import random
-
+import csv
 from pipelines.downloader.download_url import DownloaderUrl
 
 logging.basicConfig(
@@ -15,7 +15,7 @@ logging.basicConfig(
 parser = argparse.ArgumentParser()
 parser.add_argument("--input", help="input file path", default="musics.xml")
 parser.add_argument(
-    "--output", help="output directory path", default="/media/works/audio_v3/"
+    "--output", help="output directory path", default="/media/works/test/"
 )
 args = parser.parse_args()
 
@@ -24,7 +24,13 @@ if not os.path.exists(args.input):
 
 os.makedirs(args.output, exist_ok=True)
 
-downloader = DownloaderUrl()
+downloader = DownloaderUrl(100)
+
+csv_path = os.path.join(args.output, "metadata.csv")
+# Create the CSV file and write the header
+with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
+    csvwriter = csv.writer(csvfile)
+    csvwriter.writerow(["file_name", "tags"])  # Header
 
 
 def generator_urls():
@@ -53,6 +59,11 @@ def generator_urls():
                 file_idx = str(random.randint(0, 10**10)).zfill(10)
 
             yield urls, metatags, file_idx
+
+            # Write the file name and metadata to the CSV
+            with open(csv_path, "a", newline="", encoding="utf-8") as csvfile:
+                csvwriter = csv.writer(csvfile)
+                csvwriter.writerow([file_idx + ".mp3", metatags])
 
 
 downloader.download_all(generator_urls(), args.output)
