@@ -19,9 +19,8 @@ python3 -m scripts.dl.py
 python3 -m scripts.huggingface.py
 ```
 
-
-## Process
+## Transcribe
 
 ```
-python3 -m scripts.process.py
+python3 -m scripts.transcribe.py
 ```

@@ -2,12 +2,17 @@ import logging
 
 import soundfile
 from audiotools import AudioSignal
-from datasets import load_dataset
+from datasets import Audio, load_dataset
 
 from pipelines.transcript import TranscriptModel
 
 asr = TranscriptModel()
-ds = load_dataset("WaveGenAI/audios", split="train")
+ds = load_dataset(
+    "audiofolder", data_dir="/media/works/test/", split="train"
+).cast_column("audio", Audio(mono=False))
+
+# select first 50 samples
+ds = ds.select(range(30_000))
 
 
 def prepare_audio(row, idx):
@@ -29,4 +34,7 @@ def prepare_audio(row, idx):
 
 
 ds = ds.map(prepare_audio, with_indices=True)
-ds.push_to_hub("WaveGenAI/audio_processed")
+ds.save_to_disk("/media/works/test/lyrics")
+
+# push to hub
+ds.push_to_hub("WaveGenAI/lyrics", private=True)

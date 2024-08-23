@@ -1,11 +1,14 @@
 import logging
 import os
+import subprocess
 from typing import Union
 
 import numpy
 import numpy as np
 import torch
-from faster_whisper import BatchedInferencePipeline, WhisperModel
+from faster_whisper import WhisperModel
+from transformers import pipeline
+from transformers.utils import is_flash_attn_2_available
 
 from .utils import compact_repetitions
 
@@ -15,12 +18,10 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()],
 )
 
-TRANSCRIPT_THRESHOLD = 0.6
-CMD = """ 
-export LD_LIBRARY_PATH=`python3 -c 'import os; import nvidia.cublas.lib; import nvidia.cudnn.lib; import torch; print(os.path.dirname(nvidia.cublas.lib.__file__) + ":" + os.path.dirname(nvidia.cudnn.lib.__file__) + ":" + os.path.dirname(torch.__file__) +"/lib")'`
-""".strip()
+# RUN export LD_LIBRARY_PATH=`python3 -c 'import os; import nvidia.cublas.lib; import nvidia.cudnn.lib; import torch; print(os.path.dirname(nvidia.cublas.lib.__file__) + ":" + os.path.dirname(nvidia.cudnn.lib.__file__) + ":" + os.path.dirname(torch.__file__) +"/lib")'`
+# before running the script
 
-os.system(CMD)
+TRANSCRIPT_THRESHOLD = 0.6
 
 
 class TranscriptModel:
@@ -34,10 +35,21 @@ class TranscriptModel:
         for i in range(torch.cuda.device_count()):
             device_index.append(i)
 
-        self.model = WhisperModel(
+        self.validation_model = WhisperModel(
             "large-v3", compute_type="int8_float16", device_index=device_index
         )
-        # self.model = BatchedInferencePipeline(self.model)
+
+        self.transcription_model = pipeline(
+            "automatic-speech-recognition",
+            model="openai/whisper-large-v3",
+            torch_dtype=torch.float16,
+            device="cuda",
+            model_kwargs=(
+                {"attn_implementation": "flash_attention_2"}
+                if is_flash_attn_2_available()
+                else {"attn_implementation": "sdpa"}
+            ),
+        )
 
     def calculate_logprob(self, lst_prob: list, language_prob: float) -> float:
         """
@@ -46,20 +58,17 @@ class TranscriptModel:
 
         return np.exp(sum(lst_prob) / (len(lst_prob) + 0.000000001)) * language_prob
 
-    def transcript(self, audio: Union[str, numpy.array]) -> None | str:
-        """Transcribe audio file.
-
-        Args:
-            audio (Union[str, numpy.array]): The audio file path or numpy array.
-        Returns:
-            None | str: the transcribed text
+    def contain_lyrics(self, audio: Union[str, numpy.array]) -> bool:
+        """
+        Check if the audio file contains lyrics.
         """
 
-        segments, info = self.model.transcribe(audio, beam_size=5)
-
+        segments, info = self.validation_model.transcribe(audio, beam_size=5)
         language_prob = info.language_probability
         probs = []
-        lyrics = ""
+
+        # true if the language detected is higger than the threshold
+        is_lyrics = info.language_probability >= TRANSCRIPT_THRESHOLD
 
         if language_prob >= TRANSCRIPT_THRESHOLD:
             for segment in segments:
@@ -69,26 +78,41 @@ class TranscriptModel:
                     self.calculate_logprob(probs, language_prob) < TRANSCRIPT_THRESHOLD
                     and len(probs) > 5
                 ):
+                    is_lyrics = False
                     break
 
-                lyrics += segment.text.strip() + "\n"
+                if len(probs) > 5:
+                    break
 
-        if self.calculate_logprob(probs, language_prob) < TRANSCRIPT_THRESHOLD:
-            logging.warning(
-                "Low average logprob: %s", self.calculate_logprob(probs, language_prob)
-            )
-            lyrics = ""
+        return is_lyrics
+
+    def transcript(
+        self, audio: Union[str, numpy.array], check_lyrics: bool = True
+    ) -> None | str:
+        """Transcribe audio file.
+
+        Args:
+            audio (Union[str, numpy.array]): The audio file path or numpy array.
+            check_lyrics (bool): Whether to check if the audio contains lyrics.
+        Returns:
+            None | str: the transcribed text
+        """
+
+        if check_lyrics and not self.contain_lyrics(audio):
+            return ""
+
+        # use insanely-fast-whisper for transcription (faster but don't return confidence)
+        lyrics = self.transcription_model(
+            audio,
+            chunk_length_s=30,
+            batch_size=5,
+            return_timestamps=True,
+        )["text"]
 
         lyrics = compact_repetitions(lyrics)
 
         if len(lyrics) < 150 and len(lyrics) > 0:
             logging.warning("Short lyrics: %s", len(lyrics))
             lyrics = ""
-
-        if lyrics != "":
-            logging.info("Lyrics: \n%s", lyrics.strip())
-            logging.info(
-                "Language probability: %s", self.calculate_logprob(probs, language_prob)
-            )
 
         return lyrics.strip()
