@@ -1,6 +1,4 @@
 import logging
-import os
-import subprocess
 from typing import Union
 
 import numpy
@@ -10,7 +8,7 @@ from faster_whisper import WhisperModel
 from transformers import pipeline
 from transformers.utils import is_flash_attn_2_available
 
-from .utils import compact_repetitions
+from .utils import *
 
 logging.basicConfig(
     level=logging.INFO,
@@ -21,13 +19,14 @@ logging.basicConfig(
 # RUN export LD_LIBRARY_PATH=`python3 -c 'import os; import nvidia.cublas.lib; import nvidia.cudnn.lib; import torch; print(os.path.dirname(nvidia.cublas.lib.__file__) + ":" + os.path.dirname(nvidia.cudnn.lib.__file__) + ":" + os.path.dirname(torch.__file__) +"/lib")'`
 # before running the script
 
-TRANSCRIPT_THRESHOLD = 0.6
-
 
 class TranscriptModel:
     """
     Transcript class using WhisperModel for audio transcription.
     """
+
+    TRANSCRIPT_THRESHOLD = 0.6
+    BANNED_LANGUAGE = ["km"]  # often detected but very low accuracy
 
     def __init__(self) -> None:
         # get device index
@@ -68,21 +67,17 @@ class TranscriptModel:
         probs = []
 
         # true if the language detected is higger than the threshold
-        is_lyrics = info.language_probability >= TRANSCRIPT_THRESHOLD
+        is_lyrics = info.language_probability >= self.TRANSCRIPT_THRESHOLD
 
-        if language_prob >= TRANSCRIPT_THRESHOLD:
+        if is_lyrics and info.language not in self.BANNED_LANGUAGE:
             for segment in segments:
                 probs.append(segment.avg_logprob)
 
-                if (
-                    self.calculate_logprob(probs, language_prob) < TRANSCRIPT_THRESHOLD
-                    and len(probs) > 5
-                ):
-                    is_lyrics = False
-                    break
-
                 if len(probs) > 5:
                     break
+
+        if self.calculate_logprob(probs, language_prob) < self.TRANSCRIPT_THRESHOLD:
+            is_lyrics = False
 
         return is_lyrics
 
@@ -102,17 +97,25 @@ class TranscriptModel:
             return ""
 
         # use insanely-fast-whisper for transcription (faster but don't return confidence)
-        lyrics = self.transcription_model(
+        pred = self.transcription_model(
             audio,
             chunk_length_s=30,
-            batch_size=5,
+            batch_size=15,
             return_timestamps=True,
-        )["text"]
+        )
+
+        lyrics = ""
+        for p in pred["chunks"]:
+            lyrics += p["text"].strip() + "\n"
 
         lyrics = compact_repetitions(lyrics)
 
-        if len(lyrics) < 150 and len(lyrics) > 0:
+        if len(lyrics) < 300 and len(lyrics) > 0:
             logging.warning("Short lyrics: %s", len(lyrics))
+            lyrics = ""
+
+        if not check_lyrics_repetition(lyrics, 0.2):
+            logging.warning("Repetition detected in lyrics")
             lyrics = ""
 
         return lyrics.strip()

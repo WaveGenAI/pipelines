@@ -1,5 +1,5 @@
 import argparse
-import csv
+import json
 import logging
 import os
 import random
@@ -15,9 +15,7 @@ logging.basicConfig(
 # ARGUMENTS
 parser = argparse.ArgumentParser()
 parser.add_argument("--input", help="input file path", default="musics.xml")
-parser.add_argument(
-    "--output", help="output directory path", default="/media/works/test2/"
-)
+parser.add_argument("--output", help="output directory path", required=True)
 args = parser.parse_args()
 
 if not os.path.exists(args.input):
@@ -26,12 +24,6 @@ if not os.path.exists(args.input):
 os.makedirs(args.output, exist_ok=True)
 
 downloader = DownloaderUrl(100)
-
-csv_path = os.path.join(args.output, "metadata.csv")
-# Create the CSV file and write the header
-with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
-    csvwriter = csv.writer(csvfile)
-    csvwriter.writerow(["file_name", "id", "url", "tags"])
 
 
 def generator_urls():
@@ -61,10 +53,11 @@ def generator_urls():
 
             yield urls, metatags, file_idx
 
-            # Write the file name and metadata to the CSV
-            with open(csv_path, "a", newline="", encoding="utf-8") as csvfile:
-                csvwriter = csv.writer(csvfile)
-                csvwriter.writerow([file_idx + ".mp3", file_idx, urls, metatags])
+            # write a json file with the metadata
+            json_path = os.path.join(args.output, file_idx + ".json")
+            data = {"urls": urls, "metatags": metatags}
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump(data, f)
 
 
 downloader.download_all(generator_urls(), args.output)
