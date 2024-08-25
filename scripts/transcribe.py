@@ -50,9 +50,8 @@ for audio_file in tqdm.tqdm(audio_file, desc="Detect lyrics", total=len(audio_fi
 # reduce vram usage
 del asr.validation_model
 
-for audio_file in tqdm.tqdm(
-    glob.glob(BASE_DIR + "*.mp3"), desc="Transcribe lyrics", total=total_to_transcribe
-):
+pbar = tqdm.tqdm(total=total_to_transcribe)
+for audio_file in glob.glob(BASE_DIR + "*.mp3"):
     base_name = os.path.basename(audio_file).rsplit(".", 1)[0]
 
     if not os.path.exists(os.path.join(BASE_DIR, base_name + ".json")):
@@ -66,6 +65,8 @@ for audio_file in tqdm.tqdm(
 
     if metadata["lyrics"] != "TO BE FILLED":
         continue
+
+    pbar.update(1)
 
     audio_path = os.path.join(BASE_DIR, audio_file)
     lyrics = asr.transcript(audio_path, check_lyrics=False)

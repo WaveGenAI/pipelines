@@ -41,17 +41,30 @@ def compact_repetitions(text: str) -> str:
 
     while i < len(lines):
         current_line = lines[i]
-        count = 1
 
-        # Count how many times the current line repeats
+        # Extraire le texte sans timestamp pour la comparaison
+        match = re.match(r"\[.*?\](.*)", current_line)
+        if not match:
+            i += 1
+            continue
+        current_content = match.group(1).strip()
+        count = 1
+        start_time = re.match(r"\[(.*?)\]", current_line).group(1)
+
+        # Compter les répétitions de la ligne courante
         while (
-            i + 1 < len(lines) and lines[i + 1] == current_line and current_line.strip()
+            i + 1 < len(lines)
+            and re.match(r"\[.*?\](.*)", lines[i + 1]).group(1).strip()
+            == current_content
         ):
             count += 1
             i += 1
 
-        if count > 1 and current_line.strip():
-            compacted_lines.append(f"{current_line} (x{count})")
+        if count > 1:
+            end_time = re.match(r"\[(.*?)\]", lines[i]).group(1)
+            compacted_lines.append(
+                f"[{start_time}-{end_time}] {current_content} (x{count})"
+            )
         else:
             compacted_lines.append(current_line)
 
