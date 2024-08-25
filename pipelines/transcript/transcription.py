@@ -65,7 +65,6 @@ class TranscriptModel:
         # use zero-shot-audio-classification for checking if the audio contains lyrics (faster)
         is_lyrics, prob = is_contain_lyrics_clap(audio)
         if prob > 0.85:
-            print(is_lyrics, audio)
             return is_lyrics
 
         segments, info = self.validation_model.transcribe(audio, beam_size=1)
@@ -85,7 +84,6 @@ class TranscriptModel:
         if self.calculate_logprob(probs, language_prob) < self.TRANSCRIPT_THRESHOLD:
             is_lyrics = False
 
-        print(is_lyrics, audio)
         return is_lyrics
 
     def transcript(
@@ -107,13 +105,14 @@ class TranscriptModel:
         pred = self.transcription_model(
             audio,
             chunk_length_s=30,
-            batch_size=15,
+            batch_size=10,
             return_timestamps=True,
         )
 
         lyrics = ""
         for p in pred["chunks"]:
-            lyrics += p["text"].strip() + "\n"
+            line = f"[{p['timestamp'][0]}:{p['timestamp'][1]}] {p['text'].strip()}"
+            lyrics += line + "\n"
 
         if get_lines_ratio(lyrics) > 200:
             logging.warning("Too many characters per line: %s", get_lines_ratio(lyrics))

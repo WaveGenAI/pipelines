@@ -1,3 +1,4 @@
+import argparse
 import glob
 import json
 import logging
@@ -7,11 +8,15 @@ import tqdm
 
 from pipelines.transcript.transcription import TranscriptModel
 
+args = argparse.ArgumentParser()
+args.add_argument("--directory", type=str, required=True)
+args = args.parse_args()
+
 # disable logging info
 logging.getLogger().setLevel(logging.WARNING)
 
 asr = TranscriptModel()
-BASE_DIR = "/media/works/test2/"
+BASE_DIR = args.directory
 
 total_to_transcribe = 0
 

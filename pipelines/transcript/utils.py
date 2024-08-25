@@ -1,3 +1,5 @@
+import re
+
 import torch
 from transformers import pipeline
 
@@ -9,6 +11,18 @@ audio_classifier = pipeline(
     model="laion/larger_clap_music_and_speech",
     device=device,
 )
+
+
+def remove_brackets(text: str) -> str:
+    """Remove text between brackets [].
+
+    Args:
+        text (str): The text to remove the brackets from.
+
+    Returns:
+        str: The text with the brackets removed.
+    """
+    return re.sub(r"\[.*?\]", "", text)
 
 
 def compact_repetitions(text: str) -> str:
@@ -46,13 +60,14 @@ def compact_repetitions(text: str) -> str:
     return "\n".join(compacted_lines)
 
 
-def check_lyrics_repetition(lyrics, threshold=0.2):
-    lyrics = lyrics.replace("\n", "").replace(" ", "")
-    total_length = len(lyrics)
+def check_lyrics_repetition(text, threshold=0.2):
+    text = remove_brackets(text)
+    text = text.replace("\n", "").replace(" ", "")
+    total_length = len(text)
 
     char_count = {}
 
-    for char in lyrics:
+    for char in text:
         if char in char_count:
             char_count[char] += 1
         else:
@@ -74,6 +89,7 @@ def get_lines_ratio(text: str) -> float:
     Returns:
         float: The ratio of characters to lines.
     """
+    text = remove_brackets(text)
     num_char = len(text)
     num_line = len(text.splitlines())
 

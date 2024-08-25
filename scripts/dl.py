@@ -14,7 +14,9 @@ logging.basicConfig(
 
 # ARGUMENTS
 parser = argparse.ArgumentParser()
-parser.add_argument("--input", help="input file path", default="musics.xml")
+parser.add_argument(
+    "--input", help="input file path", default="musics.xml", required=True
+)
 parser.add_argument("--output", help="output directory path", required=True)
 args = parser.parse_args()
 
