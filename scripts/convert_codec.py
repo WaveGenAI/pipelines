@@ -16,7 +16,6 @@ args.add_argument("--delete", action="store_true")
 args = args.parse_args()
 
 BASE_DIR = os.path.join(args.directory, "")
-audio_files = glob.glob(BASE_DIR + "*.mp3")
 
 accelerator = Accelerator()
 device = accelerator.device
@@ -26,11 +25,18 @@ model = dac.DAC.load(model_path)
 model.eval()
 model.to(device)
 
+# rename all files that start with a 0, like that it possible to send them in the dataloader with accelerate (very hacky xd)
+for audio_file in os.listdir(BASE_DIR):
+    if audio_file.startswith("0"):
+        new_name = "1" + audio_file
+        os.rename(os.path.join(BASE_DIR, audio_file), os.path.join(BASE_DIR, new_name))
+
+audio_files = glob.glob(BASE_DIR + "*.mp3")
+
 
 def gen_data():
     for audio_file in audio_files:
-        base_file = audio_file.split("/")[-1].split(".")[0]
-
+        base_file = audio_file[:-4].rsplit("/", 1)[-1]
         signal = AudioSignal(os.path.join(BASE_DIR, audio_file))
         signal = signal.resample(model.sample_rate)
         signal.to(model.device)
@@ -60,12 +66,15 @@ for data in tqdm.tqdm(dataloader, total=len(audio_files)):
         continue
 
     for c, file_name in batch:
+        file_name = (
+            str(file_name)[:-3] + "_" + str(file_name)[-3:]
+        )  # hacky but easy method to save the file
         # save the batch in an array file
         path = os.path.join(BASE_DIR, f"{file_name}.pt")
         torch.save(c, path)
 
         # delete the audio file
-        if args.delete:
-            os.remove(os.path.join(BASE_DIR, f"{file_name}.mp3"))
+        audio_file = os.path.join(BASE_DIR, f"{file_name}.mp3")
+        os.remove(audio_file)
 
     batch = []
