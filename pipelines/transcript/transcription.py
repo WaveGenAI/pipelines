@@ -62,7 +62,13 @@ class TranscriptModel:
         Check if the audio file contains lyrics.
         """
 
-        segments, info = self.validation_model.transcribe(audio, beam_size=5)
+        # use zero-shot-audio-classification for checking if the audio contains lyrics (faster)
+        is_lyrics, prob = is_contain_lyrics_clap(audio)
+        if prob > 0.85:
+            print(is_lyrics, audio)
+            return is_lyrics
+
+        segments, info = self.validation_model.transcribe(audio, beam_size=1)
         language_prob = info.language_probability
         probs = []
 
@@ -79,6 +85,7 @@ class TranscriptModel:
         if self.calculate_logprob(probs, language_prob) < self.TRANSCRIPT_THRESHOLD:
             is_lyrics = False
 
+        print(is_lyrics, audio)
         return is_lyrics
 
     def transcript(
@@ -108,9 +115,13 @@ class TranscriptModel:
         for p in pred["chunks"]:
             lyrics += p["text"].strip() + "\n"
 
+        if get_lines_ratio(lyrics) > 200:
+            logging.warning("Too many characters per line: %s", get_lines_ratio(lyrics))
+            lyrics = ""
+
         lyrics = compact_repetitions(lyrics)
 
-        if len(lyrics) < 300 and len(lyrics) > 0:
+        if len(lyrics) < 400 and len(lyrics) > 0:
             logging.warning("Short lyrics: %s", len(lyrics))
             lyrics = ""
 

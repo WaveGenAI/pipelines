@@ -1,10 +1,14 @@
 import torch
-from transformers import GPT2LMHeadModel, GPT2Tokenizer
+from transformers import pipeline
 
-model_name = "gpt2"
-model = GPT2LMHeadModel.from_pretrained(model_name)
-tokenizer = GPT2Tokenizer.from_pretrained(model_name)
-max_length = model.config.n_positions
+labels = ["A music recoding with lyrics", "A music recording without lyrics"]
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+audio_classifier = pipeline(
+    task="zero-shot-audio-classification",
+    model="laion/larger_clap_music_and_speech",
+    device=device,
+)
 
 
 def compact_repetitions(text: str) -> str:
@@ -59,3 +63,41 @@ def check_lyrics_repetition(lyrics, threshold=0.2):
             return False
 
     return True
+
+
+def get_lines_ratio(text: str) -> float:
+    """Find the ratio of characters to lines in a text.
+
+    Args:
+        text (str): The text to analyze.
+
+    Returns:
+        float: The ratio of characters to lines.
+    """
+    num_char = len(text)
+    num_line = len(text.splitlines())
+
+    return num_char / (num_line + 0.0001)
+
+
+def is_contain_lyrics_clap(audio_path: str) -> tuple[bool, float]:
+    """Function to check if the audio contains lyrics.
+
+    Args:
+        audio_path (str): The audio file path.
+
+    Returns:
+        tuple[bool, float]: Whether the audio contains lyrics and the difference between the highest and lowest score.
+    """
+    results = audio_classifier(
+        audio_path,
+        candidate_labels=labels,
+    )
+
+    top_label = results[0]["label"]
+    results = [pred["score"] for pred in results]
+
+    return (
+        top_label == "A music recoding with lyrics",
+        max(results) - min(results),
+    )

@@ -1,3 +1,4 @@
+import glob
 import json
 import logging
 import os
@@ -14,13 +15,9 @@ BASE_DIR = "/media/works/test2/"
 
 total_to_transcribe = 0
 
+audio_file = glob.glob(BASE_DIR + "*.mp3")
 # Get all audio that contains lyrics
-for audio_file in tqdm.tqdm(
-    os.listdir(BASE_DIR), desc="Detect lyrics", total=len(os.listdir(BASE_DIR)) // 2
-):
-    if not audio_file.endswith(".mp3"):
-        continue
-
+for audio_file in tqdm.tqdm(audio_file, desc="Detect lyrics", total=len(audio_file)):
     base_name = os.path.basename(audio_file).rsplit(".", 1)[0]
 
     if not os.path.exists(os.path.join(BASE_DIR, base_name + ".json")):
@@ -34,25 +31,23 @@ for audio_file in tqdm.tqdm(
             total_to_transcribe += 1
         continue
 
+    metadata["lyrics"] = ""
     audio_path = os.path.join(BASE_DIR, audio_file)
     try:
         is_lyrics = asr.contain_lyrics(audio_path)
-    except RuntimeError:
-        continue
-
-    metadata["lyrics"] = "" if not is_lyrics else "TO BE FILLED"
+        metadata["lyrics"] = "" if not is_lyrics else "TO BE FILLED"
+    except RuntimeError as e:
+        print(f"Error: {audio_path}, {e}")
 
     with open(os.path.join(BASE_DIR, base_name + ".json"), "w", encoding="utf-8") as f:
         json.dump(metadata, f)
 
+# reduce vram usage
 del asr.validation_model
 
 for audio_file in tqdm.tqdm(
-    os.listdir(BASE_DIR), desc="Transcribe lyrics", total=total_to_transcribe
+    glob.glob(BASE_DIR + "*.mp3"), desc="Transcribe lyrics", total=total_to_transcribe
 ):
-    if not audio_file.endswith(".mp3"):
-        continue
-
     base_name = os.path.basename(audio_file).rsplit(".", 1)[0]
 
     if not os.path.exists(os.path.join(BASE_DIR, base_name + ".json")):
