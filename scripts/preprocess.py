@@ -35,7 +35,7 @@ for metadata in tqdm.tqdm(
 
     # shuffle the tags
     random.shuffle(tags)
-    data["prompt"] = tags
+    data["prompt"] = " ".join(tags)
 
     with open(os.path.join(BASE_DIR, metadata), "w", encoding="utf-8") as f:
         json.dump(data, f)

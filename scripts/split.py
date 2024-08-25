@@ -87,11 +87,12 @@ def lyrics_in_interval(
 args = argparse.ArgumentParser()
 args.add_argument("--directory", type=str, required=True)
 args.add_argument("--output", type=str, required=True)
+args.add_argument("--chunk-size", type=int, default=30)
 args = args.parse_args()
 
 BASE_DIR = args.directory
 OUTPUT_DIR = args.output
-
+CHUNK_SIZE = args.chunk_size
 
 # Ensure the output directory exists
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -109,7 +110,7 @@ for audio_file in tqdm.tqdm(glob.glob(BASE_DIR + "*.mp3"), desc="Split audio"):
     with open(metadata_file, "r", encoding="utf-8") as f:
         metadata = json.load(f)
 
-    # Use ffmpeg to split the audio file into 30-second chunks
+    # Use ffmpeg to split the audio file into CHUNK_SIZE-second chunks
     output_pattern = os.path.join(OUTPUT_DIR, base_name + "_%03d.mp3")
     command = [
         "ffmpeg",
@@ -118,7 +119,7 @@ for audio_file in tqdm.tqdm(glob.glob(BASE_DIR + "*.mp3"), desc="Split audio"):
         "-f",
         "segment",
         "-segment_time",
-        "30",
+        str(CHUNK_SIZE),
         "-c",
         "copy",
         output_pattern,
@@ -132,7 +133,7 @@ for audio_file in tqdm.tqdm(glob.glob(BASE_DIR + "*.mp3"), desc="Split audio"):
         # Extract start time from the chunk filename
         chunk_base_name = os.path.basename(chunk_file)
         start_time_str = chunk_base_name.split("_")[-1].split(".")[0]
-        start_time = int(start_time_str) * 30
+        start_time = int(start_time_str) * CHUNK_SIZE
 
         # Update metadata with start time
         chunk_metadata = metadata.copy()
@@ -154,9 +155,9 @@ for file in tqdm.tqdm(glob.glob(OUTPUT_DIR + "*.json"), desc="Split lyrics"):
     if not metadata["lyrics"]:
         continue
 
-    # Extract the lyrics that fall within the 30-second interval
+    # Extract the lyrics that fall within the CHUNK_SIZE-second interval
     lyrics = lyrics_in_interval(
-        metadata["lyrics"], metadata["start_time"], metadata["start_time"] + 30
+        metadata["lyrics"], metadata["start_time"], metadata["start_time"] + CHUNK_SIZE
     )
 
     metadata["lyrics"] = lyrics
