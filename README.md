@@ -25,6 +25,19 @@ python3 -m scripts.dl --input FILE --directory DIR
 
 This command reads the URLs from the specified input file and downloads each audio file into the provided directory.
 
+## Filter
+
+Remove all the invalid files downloaded:
+
+```bash
+python3 -m scripts.filter --directory DIR --min_duration DURATION
+```
+
+- **`--directory DIR`**: Specifies the directory where the files will be scanned
+- **`--min_duration DURATION`**: The minimum duration of a mp3 file
+
+
+
 ## Transcribe
 
 To convert the downloaded audio files into text transcriptions, use the following command:
@@ -62,3 +75,14 @@ python3 -m scripts.split --chunk-size 30 --directory DIR --output DIR
 - **`--output DIR`**: Specifies the directory where the resulting audio chunks will be saved.
 
 This command splits each audio file in the input directory into smaller chunks of the specified size and saves them to the output directory. This is useful for handling large audio files, making them easier to process in subsequent steps.
+
+## Push to huggingface
+
+To push the generated dataset to huggingface for training, run the command:
+
+```bash
+python3 -m scripts.push_to_huggingface --directory DIR --repo NAME
+```
+
+- **`--directory DIR`**: Specifies the directory containing the audio files
+- **`--repo NAME`**: The name of the dataset that will be push on huggingface

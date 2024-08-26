@@ -44,6 +44,21 @@ def gen_data():
         yield signal.audio_data, signal.sample_rate, int(base_file)
 
 
+def save_batch(batch: list, delete: bool = False):
+    for c, file_name in batch:
+        file_name = (
+            str(file_name)[:-3] + "_" + str(file_name)[-3:]
+        )  # hacky but easy method to save the file
+        # save the batch in an array file
+        path = os.path.join(BASE_DIR, f"{file_name}.pt")
+        torch.save(c, path)
+
+        if delete:
+            # delete the audio file
+            audio_file = os.path.join(BASE_DIR, f"{file_name}.mp3")
+            os.remove(audio_file)
+
+
 ds = IterableDataset.from_generator(gen_data)
 ds = ds.with_format("torch")
 
@@ -65,16 +80,8 @@ for data in tqdm.tqdm(dataloader, total=len(audio_files)):
     if len(batch) <= 10:
         continue
 
-    for c, file_name in batch:
-        file_name = (
-            str(file_name)[:-3] + "_" + str(file_name)[-3:]
-        )  # hacky but easy method to save the file
-        # save the batch in an array file
-        path = os.path.join(BASE_DIR, f"{file_name}.pt")
-        torch.save(c, path)
-
-        # delete the audio file
-        audio_file = os.path.join(BASE_DIR, f"{file_name}.mp3")
-        os.remove(audio_file)
+    save_batch(batch, args.delete)
 
     batch = []
+
+save_batch(batch, args.delete)
