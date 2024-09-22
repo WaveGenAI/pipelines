@@ -2,6 +2,7 @@
 Script to download a file from a URL
 """
 
+import csv
 import logging
 import os
 from typing import List
@@ -30,6 +31,27 @@ class DownloaderUrl(Downloader):
         self._dl_simultaneous = 0
         self._max_dl_simultaneous = max_dl_simultaneous
         self._session = Session(connections=self._max_dl_simultaneous)
+
+    def _write_index(self, url, index: int, output_dir: str):
+        """Write the index to a file.
+
+        Args:
+            index (int): The index to write.
+            output_dir (str): The output directory.
+        """
+
+        if not os.path.exists(os.path.join(output_dir, "index.csv")):
+            with open(
+                os.path.join(output_dir, "index.csv"), "w", newline="", encoding="utf-8"
+            ) as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(["url", "index"])
+
+        with open(
+            os.path.join(output_dir, "index.csv"), "a", newline="", encoding="utf-8"
+        ) as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow([url, index])
 
     def download_all(self, urls: List[str], output_dir: str):
         """
@@ -69,6 +91,8 @@ class DownloaderUrl(Downloader):
                                 async for chunk in response.body(timeout=5):
                                     f.write(chunk)
 
+                            self._write_index(url, path, output_dir)
+
                             end_task = True
                             logging.info("Downloaded: %s", url)
                 except asks.errors.RequestTimeout:
@@ -88,7 +112,7 @@ class DownloaderUrl(Downloader):
             """
 
             async with trio.open_nursery() as n:
-                for url, _, file_idx in urls:
+                for url, file_idx in urls:
                     self._dl_simultaneous += 1
                     n.start_soon(grabber, url, file_idx + ".mp3")
 
