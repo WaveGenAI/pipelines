@@ -1,11 +1,10 @@
 import argparse
 import csv
-import json
 import logging
 import os
 import random
 
-from pipelines.downloader.download_url import DownloaderUrl
+from pipelines.downloader.download_youtube import DownloadYoutube
 
 logging.basicConfig(
     level=logging.INFO,
@@ -24,7 +23,7 @@ if not os.path.exists(args.input_file):
 
 os.makedirs(args.output_dir, exist_ok=True)
 
-downloader = DownloaderUrl(100)
+downloader = DownloadYoutube(args.output_dir)
 
 
 def generator_urls():
@@ -49,7 +48,7 @@ def generator_urls():
             raise ValueError("URL column not found in the input file")
 
         for line in reader:
-            if not line[url_idx].endswith(".mp3"):
+            if not line[url_idx].startswith("https://www.youtube.com/watch?v="):
                 continue
 
             yield line[url_idx]

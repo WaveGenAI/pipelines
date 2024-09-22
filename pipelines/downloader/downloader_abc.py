@@ -12,13 +12,26 @@ class Downloader(abc.ABC):
     """
 
     @abc.abstractmethod
-    def download_all(self, urls: List[str], output_dir: str) -> None:
+    def download_all(self, urls: List[str]) -> None:
         """
         Download the data from the internet.
 
         Args:
             urls (List[str]): List of URLs to download.
             output_dir (str): The output directory.
+
+        Returns:
+            None
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def _write_index(self, url, index: int) -> None:
+        """
+        Write the index to a file.
+
+        Args:
+            index (int): The index to write.
 
         Returns:
             None

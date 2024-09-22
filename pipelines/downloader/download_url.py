@@ -5,7 +5,8 @@ Script to download a file from a URL
 import csv
 import logging
 import os
-from typing import List
+import random
+from typing import List, Tuple
 
 import asks
 import trio
@@ -19,7 +20,7 @@ class DownloaderUrl(Downloader):
     DownloaderUrl class using aiohttp for async downloads.
     """
 
-    def __init__(self, max_dl_simultaneous=100):
+    def __init__(self, output_dir: str, max_dl_simultaneous=100):
         """DownloaderUrl constructor.
 
         Args:
@@ -30,37 +31,41 @@ class DownloaderUrl(Downloader):
 
         self._dl_simultaneous = 0
         self._max_dl_simultaneous = max_dl_simultaneous
+        self._output_dir = output_dir
         self._session = Session(connections=self._max_dl_simultaneous)
 
-    def _write_index(self, url, index: int, output_dir: str):
+    def _write_index(self, url, index: int):
         """Write the index to a file.
 
         Args:
             index (int): The index to write.
-            output_dir (str): The output directory.
         """
 
-        if not os.path.exists(os.path.join(output_dir, "index.csv")):
+        if not os.path.exists(os.path.join(self._output_dir, "index.csv")):
             with open(
-                os.path.join(output_dir, "index.csv"), "w", newline="", encoding="utf-8"
+                os.path.join(self._output_dir, "index.csv"),
+                "w",
+                newline="",
+                encoding="utf-8",
             ) as csvfile:
                 writer = csv.writer(csvfile)
                 writer.writerow(["url", "index"])
 
         with open(
-            os.path.join(output_dir, "index.csv"), "a", newline="", encoding="utf-8"
+            os.path.join(self._output_dir, "index.csv"),
+            "a",
+            newline="",
+            encoding="utf-8",
         ) as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow([url, index])
 
-    def download_all(self, urls: List[str], output_dir: str):
+    def download_all(self, urls: List[Tuple[str]]):
         """
         Download multiple files from a list of URLs asynchronously.
 
         Args:
             urls (List[str]): The list of URLs to download (URL, file index).
-            output_dir (str): The output directory.
-            max_chunk (int, optional): The maximum number of chunks to download. Defaults to 1500.
         """
 
         async def grabber(url, path):
@@ -87,11 +92,11 @@ class DownloaderUrl(Downloader):
                                 end_task = True
 
                         if not end_task:
-                            with open(os.path.join(output_dir, path), "wb") as f:
+                            with open(os.path.join(self._output_dir, path), "wb") as f:
                                 async for chunk in response.body(timeout=5):
                                     f.write(chunk)
 
-                            self._write_index(url, path, output_dir)
+                            self._write_index(url, path)
 
                             end_task = True
                             logging.info("Downloaded: %s", url)
@@ -112,7 +117,14 @@ class DownloaderUrl(Downloader):
             """
 
             async with trio.open_nursery() as n:
-                for url, file_idx in urls:
+                for url in urls:
+                    # create random id to name the file (fill with 0 if smaller than 10)
+                    file_idx = str(random.randint(0, 10**10)).zfill(10)
+                    while os.path.exists(
+                        os.path.join(self._output_dir, file_idx + ".mp3")
+                    ):
+                        file_idx = str(random.randint(0, 10**10)).zfill(10)
+
                     self._dl_simultaneous += 1
                     n.start_soon(grabber, url, file_idx + ".mp3")
 
