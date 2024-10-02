@@ -13,6 +13,12 @@ if __name__ == "__main__":
         "--huggingface", type=str, help="Huggingface dataset name", required=True
     )
     parser.add_argument(
+        "--shuffle",
+        action="store_true",
+        help="Shuffle the input dataset",
+        required=False,
+    )
+    parser.add_argument(
         "--download", action="store_true", help="Download the dataset", required=False
     )
     args = parser.parse_args()
@@ -21,6 +27,11 @@ if __name__ == "__main__":
 
     if args.download:
         Downloader(dataset)
+
+    if args.shuffle:
+        for split in dataset:
+            dataset[split] = dataset[split].shuffle(seed=42)
+            dataset[split] = dataset[split].flatten_indices()
 
     # add audio files to the dataset
     for split in dataset:
