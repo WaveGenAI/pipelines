@@ -1,20 +1,2 @@
-requests
-transformers
-essentia
-librosa
-aiohttp
-asks
-trio
-anyio[trio]
-ray
-ray[data]
-descript-audio-codec
-eyed3
 datasets
-accelerate
-
-faster-whisper @ https://github.com/SYSTRAN/faster-whisper/archive/refs/heads/master.tar.gz
-git+https://github.com/descriptinc/audiotools
-
-torch==2.3.1
-torchaudio==2.3.1
+pytubefix
