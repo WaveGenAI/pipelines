@@ -13,9 +13,10 @@ class Downloader:
         self._run()
 
     def _run(self):
+        # add audio column to the dataset
         for column in self._dataset:
-            for data in self._dataset[column]:
+            for idx, data in enumerate(self._dataset[column]):
                 url = data["url"]
 
                 if url.startswith("https://www.youtube.com"):
-                    self._ytb_downloader.add_url(url)
+                    self._ytb_downloader.add_url(url, f"{column}_{idx}")
