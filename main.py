@@ -1,6 +1,7 @@
 import argparse
+import os
 
-from datasets import load_dataset
+from datasets import Audio, load_dataset
 
 from pipelines import Downloader
 
@@ -20,3 +21,23 @@ if __name__ == "__main__":
 
     if args.download:
         Downloader(dataset)
+
+    # add audio files to the dataset
+    for split in dataset:
+        audio_files = []
+
+        for idx, data in enumerate(dataset[split]):
+            if os.path.exists(f".pipelines/{split}_{idx}.mp3"):
+                audio_files.append(f".pipelines/{split}_{idx}.mp3")
+            else:
+                audio_files.append(None)
+
+        dataset[split] = dataset[split].add_column("audio", audio_files)
+
+    # delete all rows without audio
+    for split in dataset:
+        dataset[split] = dataset[split].filter(lambda x: x["audio"] is not None)
+
+    # cast audio column
+    for split in dataset:
+        dataset[split] = dataset[split].cast_column("audio", Audio(mono=False))
