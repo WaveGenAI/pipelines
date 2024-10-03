@@ -38,8 +38,8 @@ if __name__ == "__main__":
         audio_files = []
 
         for idx, data in enumerate(dataset[split]):
-            if os.path.exists(f".pipelines/{split}_{idx}.mp3"):
-                audio_files.append(f".pipelines/{split}_{idx}.mp3")
+            if os.path.exists(f".pipelines/{split}_{idx}.wav"):
+                audio_files.append(os.path.abspath(f".pipelines/{split}_{idx}.wav"))
             else:
                 audio_files.append(None)
 
@@ -52,3 +52,5 @@ if __name__ == "__main__":
     # cast audio column
     for split in dataset:
         dataset[split] = dataset[split].cast_column("audio", Audio(mono=False))
+
+    print(dataset["train"][0])

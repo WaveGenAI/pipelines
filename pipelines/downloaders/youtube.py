@@ -4,6 +4,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytubefix.exceptions
+from pydub import AudioSegment
 from pytubefix import YouTube
 
 logging.basicConfig(level=logging.INFO)
@@ -47,6 +48,14 @@ class YoutubeDownloader:
                 )
                 audio = video.streams.get_audio_only()
                 audio.download(mp3=True, output_path=".pipelines", filename=file_name)
+
+                # convert to wav
+                sound = AudioSegment.from_file(f".pipelines/{file_name}.mp3")
+                sound.export(f".pipelines/{file_name}.wav", format="wav")
+
+                # delete mp3
+                os.remove(f".pipelines/{file_name}.mp3")
+
                 success = True
             except Exception as error:  # pylint: disable=broad-except
                 if error.__class__ not in (
