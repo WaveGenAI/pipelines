@@ -1,3 +1,5 @@
+import hashlib
+
 from datasets import Dataset
 
 from .downloaders import YoutubeDownloader
@@ -15,8 +17,9 @@ class Downloader:
     def _run(self):
         # add audio column to the dataset
         for split in self._dataset:
-            for idx, data in enumerate(self._dataset[split]):
+            for data in self._dataset[split]:
                 url = data["url"]
 
                 if url.startswith("https://www.youtube.com"):
-                    self._ytb_downloader.add_url(url, f"{split}_{idx}")
+                    base64_url = hashlib.sha256(url.encode("utf-8")).hexdigest()
+                    self._ytb_downloader.add_url(url, base64_url)
