@@ -64,14 +64,18 @@ class YoutubeDownloader:
 
                 success = True
             except Exception as error:  # pylint: disable=broad-except
-                if (
-                    error.__class__
-                    not in (
-                        pytubefix.exceptions.BotDetection,
-                        pytubefix.exceptions.VideoUnavailable,
-                    )
-                    and "connection has been closed" not in str(error)
-                    or "Remote end closed connection without response" in str(error)
+                non_critical_errors = [
+                    pytubefix.exceptions.BotDetection,
+                    pytubefix.exceptions.VideoUnavailable,
+                ]
+                non_critical_messages = [
+                    "connection has been closed",
+                    "Remote end closed connection without response",
+                    "error Tunnel connection failed",
+                ]
+
+                if error.__class__ not in non_critical_errors and not any(
+                    msg in str(error) for msg in non_critical_messages
                 ):
                     self.logging.error("Error downloading video: %s", url)
                     self.logging.error(error)
