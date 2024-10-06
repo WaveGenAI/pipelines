@@ -3,9 +3,9 @@ import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+import ffmpeg
 import pytubefix.exceptions
 from pytubefix import YouTube
-import urllib
 
 logging.basicConfig(level=logging.INFO)
 
@@ -51,25 +51,31 @@ class YoutubeDownloader:
                 )
                 audio = video.streams.get_audio_only()
                 audio.download(
-                    mp3=True, output_path=self._cache_dir, filename=file_name
+                    mp3=True, output_path=self._cache_dir, filename=file_name + "_"
                 )
 
-                # rename file
-                os.rename(
-                    os.path.join(self._cache_dir, f"{file_name}.mp3"),
-                    os.path.join(self._cache_dir, f"{file_name}_.mp3"),
-                )
+                ffmpeg.input(os.path.join(self._cache_dir, f"{file_name}_.mp3")).output(
+                    os.path.join(self._cache_dir, f"{file_name}.mp3"), format="mp3"
+                ).global_args("-loglevel", "quiet").run(
+                    overwrite_output=True
+                )  # fix soundfile reading error
+
+                os.remove(os.path.join(self._cache_dir, f"{file_name}_.mp3"))
 
                 success = True
             except Exception as error:  # pylint: disable=broad-except
-                if error.__class__ not in (
-                    pytubefix.exceptions.BotDetection,
-                    pytubefix.exceptions.VideoUnavailable,
-                ) and "connection has been closed" not in str(error):
+                if (
+                    error.__class__
+                    not in (
+                        pytubefix.exceptions.BotDetection,
+                        pytubefix.exceptions.VideoUnavailable,
+                    )
+                    and "connection has been closed" not in str(error)
+                    or "Remote end closed connection without response" in str(error)
+                ):
                     self.logging.error("Error downloading video: %s", url)
                     self.logging.error(error)
                     error_req = True
-                    print(error)
 
         if success:
             self.logging.info("Downloaded video: %s", url)
