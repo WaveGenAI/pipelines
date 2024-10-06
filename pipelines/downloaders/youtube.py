@@ -15,7 +15,7 @@ class YoutubeDownloader:
 
     def __init__(
         self,
-        num_processes: int = 40,
+        num_processes: int = 80,
         cache_dir: str = ".pipelines",
     ):
         self._num_processes = num_processes

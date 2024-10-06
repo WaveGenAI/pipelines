@@ -47,6 +47,13 @@ if __name__ == "__main__":
         help="Cache directory",
         required=False,
     )
+    parser.add_argument(
+        "--max_files",
+        type=int,
+        default=0,
+        help="Maximum number of files to download",
+        required=False,
+    )
     args = parser.parse_args()
 
     dataset = load_dataset(args.huggingface)
@@ -57,7 +64,7 @@ if __name__ == "__main__":
             dataset[split] = dataset[split].flatten_indices()
 
     if args.download:
-        Downloader(dataset, cache_dir=args.cache_dir)
+        Downloader(dataset, cache_dir=args.cache_dir, max_files=args.max_files)
 
     # add audio files to the dataset
     for split in dataset:
