@@ -16,8 +16,10 @@ class YoutubeDownloader:
     def __init__(
         self,
         num_processes: int = 40,
+        cache_dir: str = ".pipelines",
     ):
         self._num_processes = num_processes
+        self._cache_dir = cache_dir
         self.logging = logging.getLogger(__name__)
 
         # Create a thread pool with max 10 threads
@@ -33,11 +35,12 @@ class YoutubeDownloader:
             self.futures.remove(fut)
 
     def _download_ytb_video(self, url: str, file_name: str):
-        if os.path.exists(f".pipelines/{file_name}.mp3"):
+        if os.path.exists(os.path.join(self._cache_dir, f"{file_name}.mp3")):
             return
 
         success = False
-        while not success:
+        error_req = False
+        while not success and not error_req:
             try:
                 video = YouTube(
                     url,
@@ -47,25 +50,34 @@ class YoutubeDownloader:
                     },
                 )
                 audio = video.streams.get_audio_only()
-                audio.download(mp3=True, output_path=".pipelines", filename=file_name)
+                audio.download(
+                    mp3=True, output_path=self._cache_dir, filename=file_name
+                )
 
                 # convert to wav
-                sound = AudioSegment.from_file(f".pipelines/{file_name}.mp3")
-                sound.export(f".pipelines/{file_name}.wav", format="wav")
+                sound = AudioSegment.from_file(
+                    os.path.join(self._cache_dir, f"{file_name}.mp3")
+                )
+                sound.export(
+                    os.path.join(self._cache_dir, f"{file_name}.wav"), format="wav"
+                )
 
                 # delete mp3
-                os.remove(f".pipelines/{file_name}.mp3")
+                os.remove(os.path.join(self._cache_dir, f"{file_name}.mp3"))
 
                 success = True
             except Exception as error:  # pylint: disable=broad-except
                 if error.__class__ not in (
                     pytubefix.exceptions.BotDetection,
                     pytubefix.exceptions.VideoUnavailable,
-                ):
+                ):  # TODO: check all exceptions that can be raised or not
                     self.logging.error("Error downloading video: %s", url)
                     self.logging.error(error)
+                    error_req = True
 
-        self.logging.info("Downloaded video: %s", url)
+                    raise error
+        if success:
+            self.logging.info("Downloaded video: %s", url)
 
     def add_url(self, url: str, file_name: str):
         """Add a URL to the list of URLs to download."""

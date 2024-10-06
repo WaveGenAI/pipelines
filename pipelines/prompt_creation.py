@@ -32,10 +32,17 @@ Here is the information:
 class PromptCreator:
     """Class to generate prompts"""
 
-    def __init__(self, dataset, use_cache: bool = True, batch_size: int = 1):
+    def __init__(
+        self,
+        dataset,
+        use_cache: bool = True,
+        batch_size: int = 1,
+        cache_dir: str = ".pipelines",
+    ):
         self._dataset = dataset
         self._use_cache = use_cache
         self._batch_size = batch_size
+        self._cache_dir = cache_dir
 
         self.accelerator = Accelerator()
 
@@ -109,8 +116,10 @@ class PromptCreator:
 
         # check if the prompt is already generated
         file_name = hash_url(url)
-        if self._use_cache and os.path.exists(f".pipelines/{file_name}.txt"):
-            with open(f".pipelines/{file_name}.txt", "r", encoding="utf-8") as file:
+        if self._use_cache and os.path.exists(
+            os.path.join(self._cache_dir, f"{file_name}.txt")
+        ):
+            with open(os.path.join(self._cache_dir, f"{file_name}.txt"), "r") as file:
                 return file.read()
 
         output_ids = self.model.generate(
@@ -123,7 +132,7 @@ class PromptCreator:
             "Prompt:", 1
         )[1]
 
-        with open(f".pipelines/{file_name}.txt", "w", encoding="utf-8") as file:
+        with open(os.path.join(self._cache_dir, f"{file_name}.txt"), "w") as file:
             file.write(prompt)
 
         return prompt

@@ -40,6 +40,13 @@ if __name__ == "__main__":
         help="Output dataset name",
         required=True,
     )
+    parser.add_argument(
+        "--cache_dir",
+        type=str,
+        default=".pipelines",
+        help="Cache directory",
+        required=False,
+    )
     args = parser.parse_args()
 
     dataset = load_dataset(args.huggingface)
@@ -50,7 +57,7 @@ if __name__ == "__main__":
             dataset[split] = dataset[split].flatten_indices()
 
     if args.download:
-        Downloader(dataset)
+        Downloader(dataset, cache_dir=args.cache_dir)
 
     # add audio files to the dataset
     for split in dataset:
@@ -58,8 +65,8 @@ if __name__ == "__main__":
 
         for data in dataset[split]:
             file_name = hash_url(data["url"])
-            if os.path.exists(f".pipelines/{file_name}.wav"):
-                audio_files.append(os.path.abspath(f".pipelines/{file_name}.wav"))
+            if os.path.exists(os.path.join(args.cache_dir, f"{file_name}.wav")):
+                audio_files.append(os.path.join(args.cache_dir, f"{file_name}.wav"))
             else:
                 audio_files.append(None)
 
@@ -76,7 +83,10 @@ if __name__ == "__main__":
         )
 
     dataset = PromptCreator(
-        dataset, use_cache=args.use_cache, batch_size=args.batch_size
+        dataset,
+        use_cache=args.use_cache,
+        batch_size=args.batch_size,
+        cache_dir=args.cache_dir,
     ).create_prompt()
 
     dataset.push_to_hub(args.output_dataset)

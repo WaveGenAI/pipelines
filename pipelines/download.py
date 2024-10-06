@@ -8,9 +8,9 @@ from .downloaders import YoutubeDownloader
 class Downloader:
     """Download audio from urls in the dataset"""
 
-    def __init__(self, dataset: Dataset):
+    def __init__(self, dataset: Dataset, cache_dir: str = ".pipelines"):
         self._dataset = dataset
-        self._ytb_downloader = YoutubeDownloader()
+        self._ytb_downloader = YoutubeDownloader(cache_dir=cache_dir)
 
         self._run()
 
