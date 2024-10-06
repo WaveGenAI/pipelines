@@ -119,7 +119,9 @@ class PromptCreator:
         if self._use_cache and os.path.exists(
             os.path.join(self._cache_dir, f"{file_name}.txt")
         ):
-            with open(os.path.join(self._cache_dir, f"{file_name}.txt"), "r") as file:
+            with open(
+                os.path.join(self._cache_dir, f"{file_name}.txt"), "r", encoding="utf-8"
+            ) as file:
                 return file.read()
 
         output_ids = self.model.generate(
@@ -132,7 +134,9 @@ class PromptCreator:
             "Prompt:", 1
         )[1]
 
-        with open(os.path.join(self._cache_dir, f"{file_name}.txt"), "w") as file:
+        with open(
+            os.path.join(self._cache_dir, f"{file_name}.txt"), "w", encoding="utf-8"
+        ) as file:
             file.write(prompt)
 
         return prompt
