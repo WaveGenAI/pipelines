@@ -4,7 +4,7 @@ import os
 from datasets import Audio, load_dataset
 
 from pipelines import Downloader, PromptCreator
-from pipelines.utils import hash_url
+from pipelines.utils import get_bpm, hash_url
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -59,6 +59,8 @@ if __name__ == "__main__":
 
     # cast audio column
     for split in dataset:
-        dataset[split] = dataset[split].cast_column("audio", Audio(mono=False))
+        dataset[split] = dataset[split].cast_column(
+            "audio", Audio(mono=False, sampling_rate=44100)
+        )
 
     PromptCreator(dataset, use_cache=args.use_cache).create_prompt()

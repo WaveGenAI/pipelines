@@ -1,4 +1,3 @@
-import hashlib
 import os
 from typing import Any, Dict, List, Union
 
@@ -8,13 +7,14 @@ from datasets import Dataset
 from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from pipelines.utils import hash_url
+from pipelines.utils import get_bpm, hash_url
 
 PROMPT = """ 
 You will be given informations related to an audio sample. These informations include:
 1. The title
 3. The description of the audio sample
-4. Some tags related to the audio sample
+4. The tempo of the audio sample
+5. Some tags related to the audio sample
 
 Your task is to generate a short prompt for a music generation model that describes the audio sample without including any names and titles.
 The summary should be concise and capture the essence of the audio sample **without including any names and titles** and start with the word "Prompt:".
@@ -29,6 +29,8 @@ Here is the information:
 
 
 class PromptCreator:
+    """Class to generate prompts"""
+
     def __init__(self, dataset, use_cache: bool = True):
         self._dataset = dataset
         self._use_cache = use_cache
@@ -51,13 +53,13 @@ class PromptCreator:
         self, features: List[Dict[str, Union[List[int], torch.Tensor]]]
     ) -> Dict[str, torch.Tensor]:
         inputs = self.tokenizer(
-            [self.generate_prompt(feature) for feature in features],
+            [self._generate_prompt(feature) for feature in features],
             padding="longest",
             return_tensors="pt",
         )
         return inputs
 
-    def generate_prompt(self, row: Dict[str, Any]) -> str:
+    def _generate_prompt(self, row: Dict[str, Any]) -> str:
         """Function to generate prompt for the model
 
         Args:
@@ -66,6 +68,10 @@ class PromptCreator:
         Returns:
             str: Prompt for the model
         """
+
+        bpm = get_bpm(row["audio"])
+        row["BPM"] = bpm
+
         informations = ""
         for key, value in row.items():
             if isinstance(value, str):
@@ -87,7 +93,7 @@ class PromptCreator:
 
         return chat
 
-    def generate_step(self, batch: Dict[str, torch.Tensor], url: str) -> str:
+    def _generate_step(self, batch: Dict[str, torch.Tensor], url: str) -> str:
         """Function to generate text from the model
 
         Args:
@@ -100,7 +106,7 @@ class PromptCreator:
         # check if the prompt is already generated
         file_name = hash_url(url)
         if self._use_cache and os.path.exists(f".pipelines/{file_name}.txt"):
-            with open(f".pipelines/{file_name}.txt", "r") as file:
+            with open(f".pipelines/{file_name}.txt", "r", encoding="utf-8") as file:
                 return file.read()
 
         output_ids = self.model.generate(
@@ -113,12 +119,17 @@ class PromptCreator:
             "Prompt:", 1
         )[1]
 
-        with open(f".pipelines/{file_name}.txt", "w") as file:
+        with open(f".pipelines/{file_name}.txt", "w", encoding="utf-8") as file:
             file.write(prompt)
 
         return prompt
 
     def create_prompt(self) -> Dataset:
+        """Start the prompt creation process
+
+        Returns:
+            Dataset: Dataset with the generated prompts
+        """
         for split in self._dataset:
             data_loader = DataLoader(
                 self._dataset[split],
@@ -132,7 +143,7 @@ class PromptCreator:
 
             generated_prompts = []
             for idx, batch in enumerate(data_loader):
-                prompt = self.generate_step(batch, self._dataset[split][idx]["url"])
+                prompt = self._generate_step(batch, self._dataset[split][idx]["url"])
                 print(prompt)
                 print(self._dataset[split][idx]["url"])
                 generated_prompts.append(prompt)
