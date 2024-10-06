@@ -1,4 +1,3 @@
 datasets
 pytubefix
-pydub 
 librosa

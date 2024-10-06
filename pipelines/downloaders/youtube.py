@@ -4,8 +4,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytubefix.exceptions
-from pydub import AudioSegment
 from pytubefix import YouTube
+import urllib
 
 logging.basicConfig(level=logging.INFO)
 
@@ -54,28 +54,23 @@ class YoutubeDownloader:
                     mp3=True, output_path=self._cache_dir, filename=file_name
                 )
 
-                # convert to wav
-                sound = AudioSegment.from_file(
-                    os.path.join(self._cache_dir, f"{file_name}.mp3")
+                # rename file
+                os.rename(
+                    os.path.join(self._cache_dir, f"{file_name}.mp3"),
+                    os.path.join(self._cache_dir, f"{file_name}_.mp3"),
                 )
-                sound.export(
-                    os.path.join(self._cache_dir, f"{file_name}.wav"), format="wav"
-                )
-
-                # delete mp3
-                os.remove(os.path.join(self._cache_dir, f"{file_name}.mp3"))
 
                 success = True
             except Exception as error:  # pylint: disable=broad-except
                 if error.__class__ not in (
                     pytubefix.exceptions.BotDetection,
                     pytubefix.exceptions.VideoUnavailable,
-                ):  # TODO: check all exceptions that can be raised or not
+                ) and "connection has been closed" not in str(error):
                     self.logging.error("Error downloading video: %s", url)
                     self.logging.error(error)
                     error_req = True
+                    print(error)
 
-                    raise error
         if success:
             self.logging.info("Downloaded video: %s", url)
 

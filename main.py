@@ -65,8 +65,8 @@ if __name__ == "__main__":
 
         for data in dataset[split]:
             file_name = hash_url(data["url"])
-            if os.path.exists(os.path.join(args.cache_dir, f"{file_name}.wav")):
-                audio_files.append(os.path.join(args.cache_dir, f"{file_name}.wav"))
+            if os.path.exists(os.path.join(args.cache_dir, f"{file_name}_.mp3")):
+                audio_files.append(os.path.join(args.cache_dir, f"{file_name}_.mp3"))
             else:
                 audio_files.append(None)
 
