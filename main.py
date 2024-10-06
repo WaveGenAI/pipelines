@@ -27,7 +27,19 @@ if __name__ == "__main__":
         action="store_true",
         help="Use cache for prompt generation",
     )
-
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=1,
+        help="Batch size for prompt generation",
+    )
+    parser.add_argument(
+        "--output_dataset",
+        type=str,
+        default=None,
+        help="Output dataset name",
+        required=True,
+    )
     args = parser.parse_args()
 
     dataset = load_dataset(args.huggingface)
@@ -63,4 +75,8 @@ if __name__ == "__main__":
             "audio", Audio(mono=False, sampling_rate=44100)
         )
 
-    PromptCreator(dataset, use_cache=args.use_cache).create_prompt()
+    dataset = PromptCreator(
+        dataset, use_cache=args.use_cache, batch_size=args.batch_size
+    ).create_prompt()
+
+    dataset.push_to_hub(args.output_dataset)

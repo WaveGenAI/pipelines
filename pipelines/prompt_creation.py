@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import Any, Dict, List, Union
 
@@ -31,9 +32,10 @@ Here is the information:
 class PromptCreator:
     """Class to generate prompts"""
 
-    def __init__(self, dataset, use_cache: bool = True):
+    def __init__(self, dataset, use_cache: bool = True, batch_size: int = 1):
         self._dataset = dataset
         self._use_cache = use_cache
+        self._batch_size = batch_size
 
         self.accelerator = Accelerator()
 
@@ -48,6 +50,8 @@ class PromptCreator:
         self.tokenizer = AutoTokenizer.from_pretrained(
             "microsoft/Phi-3-mini-4k-instruct"
         )
+
+        self._logger = logging.getLogger(__name__)
 
     def _data_collector(
         self, features: List[Dict[str, Union[List[int], torch.Tensor]]]
@@ -133,8 +137,8 @@ class PromptCreator:
         for split in self._dataset:
             data_loader = DataLoader(
                 self._dataset[split],
-                batch_size=1,
-                num_workers=4,
+                batch_size=self._batch_size,
+                num_workers=self._batch_size + 3,
                 pin_memory=True,
                 collate_fn=self._data_collector,
             )
@@ -144,9 +148,14 @@ class PromptCreator:
             generated_prompts = []
             for idx, batch in enumerate(data_loader):
                 prompt = self._generate_step(batch, self._dataset[split][idx]["url"])
-                print(prompt)
-                print(self._dataset[split][idx]["url"])
                 generated_prompts.append(prompt)
+
+                self._logger.info(
+                    "Generated prompt for %s (%s%%): \n%s",
+                    self._dataset[split][idx]["url"],
+                    round((idx + 1) / len(data_loader) * 100, 2),
+                    prompt,
+                )
 
             # add a column for the generated prompts
             self._dataset[split] = self._dataset[split].add_column(
