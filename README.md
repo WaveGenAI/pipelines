@@ -17,7 +17,7 @@ This command installs all the necessary Python packages listed in the `requireme
 Start the proxy:
 
 ```bash
-docker run -d --rm -it -p 3128:3128 -p 4444:4444 -e "TOR_INSTANCES=40" zhaowde/rotating-tor-http-proxy
+sudo docker run --rm -it -p 3128:3128 -p 4444:4444 -e "TOR_INSTANCES=120" jourdelune/rotating-tor-http-proxy
 ```
 
 To run the pipelines

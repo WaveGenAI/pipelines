@@ -1,5 +1,5 @@
 datasets
-pytubefix
+yt-dlp
 librosa
 ffmpeg-python
 

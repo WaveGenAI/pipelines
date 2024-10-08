@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 import ffmpeg
 import pytubefix.exceptions
 from pytubefix import YouTube
+from yt_dlp import YoutubeDL
 
 logging.basicConfig(level=logging.INFO)
 
@@ -15,7 +16,7 @@ class YoutubeDownloader:
 
     def __init__(
         self,
-        num_processes: int = 80,
+        num_processes: int = 30,
         cache_dir: str = ".pipelines",
     ):
         self._num_processes = num_processes
@@ -39,47 +40,47 @@ class YoutubeDownloader:
             return
 
         success = False
-        error_req = False
-        while not success and not error_req:
-            try:
-                video = YouTube(
-                    url,
-                    proxies={
-                        "http": "http://127.0.0.1:3128",
-                        "https": "http://127.0.0.1:3128",
-                    },
-                )
-                audio = video.streams.get_audio_only()
-                audio.download(
-                    mp3=True, output_path=self._cache_dir, filename=file_name + "_"
-                )
+        while not success:
+            ydl_opts = {
+                "format": "m4a/bestaudio/best",
+                "postprocessors": [
+                    {
+                        "key": "FFmpegExtractAudio",
+                        "preferredcodec": "m4a",
+                    }
+                ],
+                "proxy": "http://127.0.0.1:3128",
+                "outtmpl": os.path.join(self._cache_dir, f"{file_name}_.m4a"),
+                "quiet": True,
+                "noprogress": True,
+            }
 
-                ffmpeg.input(os.path.join(self._cache_dir, f"{file_name}_.mp3")).output(
-                    os.path.join(self._cache_dir, f"{file_name}.mp3"), format="mp3"
-                ).global_args("-loglevel", "quiet").run(
-                    overwrite_output=True
-                )  # fix soundfile reading error
+            with YoutubeDL(ydl_opts) as ydl:
+                try:
+                    ydl.download([url])
 
-                os.remove(os.path.join(self._cache_dir, f"{file_name}_.mp3"))
+                    ffmpeg.input(
+                        os.path.join(self._cache_dir, f"{file_name}_.m4a")
+                    ).output(
+                        os.path.join(self._cache_dir, f"{file_name}.mp3"), format="mp3"
+                    ).global_args(
+                        "-loglevel", "quiet"
+                    ).run(
+                        overwrite_output=True
+                    )  # fix soundfile reading error
 
-                success = True
-            except Exception as error:  # pylint: disable=broad-except
-                non_critical_errors = [
-                    pytubefix.exceptions.BotDetection,
-                    pytubefix.exceptions.VideoUnavailable,
-                ]
-                non_critical_messages = [
-                    "connection has been closed",
-                    "Remote end closed connection without response",
-                    "error Tunnel connection failed",
-                ]
+                    os.remove(os.path.join(self._cache_dir, f"{file_name}_.m4a"))
 
-                if error.__class__ not in non_critical_errors and not any(
-                    msg in str(error) for msg in non_critical_messages
-                ):
-                    self.logging.error("Error downloading video: %s", url)
-                    self.logging.error(error)
-                    error_req = True
+                    success = True
+                except Exception as error:  # pylint: disable=broad-except
+                    non_critical_messages = [
+                        "Sign in to confirm you’re not a bot",
+                    ]
+
+                    if not any(msg in str(error) for msg in non_critical_messages):
+                        self.logging.error("Error downloading video: %s", url)
+                        self.logging.error(error)
+                        break
 
         if success:
             self.logging.info("Downloaded video: %s", url)
