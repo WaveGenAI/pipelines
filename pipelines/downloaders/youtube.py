@@ -4,9 +4,9 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 import ffmpeg
-import pytubefix.exceptions
-from pytubefix import YouTube
 from yt_dlp import YoutubeDL
+
+from pipelines.utils import cut_audio
 
 logging.basicConfig(level=logging.INFO)
 
@@ -18,9 +18,11 @@ class YoutubeDownloader:
         self,
         num_processes: int = 30,
         cache_dir: str = ".pipelines",
+        audio_duration: int = 60 * 10,
     ):
         self._num_processes = num_processes
         self._cache_dir = cache_dir
+        self._audio_duration = audio_duration
         self.logging = logging.getLogger(__name__)
 
         # Create a thread pool with max 10 threads
@@ -70,6 +72,12 @@ class YoutubeDownloader:
                     )  # fix soundfile reading error
 
                     os.remove(os.path.join(self._cache_dir, f"{file_name}_.m4a"))
+
+                    # cut the audio file
+                    cut_audio(
+                        os.path.join(self._cache_dir, f"{file_name}.mp3"),
+                        self._audio_duration,
+                    )
 
                     success = True
                 except Exception as error:  # pylint: disable=broad-except

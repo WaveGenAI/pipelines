@@ -4,7 +4,7 @@ import os
 from datasets import Audio, load_dataset
 
 from pipelines import Downloader, PromptCreator
-from pipelines.utils import get_bpm, hash_url
+from pipelines.utils import hash_url
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -54,6 +54,13 @@ if __name__ == "__main__":
         help="Maximum number of files to download",
         required=False,
     )
+    parser.add_argument(
+        "--audio_duration",
+        type=int,
+        default=60 * 10,
+        help="Duration of the audio file",
+        required=False,
+    )
     args = parser.parse_args()
 
     dataset = load_dataset(args.huggingface)
@@ -64,12 +71,18 @@ if __name__ == "__main__":
             dataset[split] = dataset[split].flatten_indices()
 
     if args.download:
-        Downloader(dataset, cache_dir=args.cache_dir, max_files=args.max_files)
+        Downloader(
+            dataset,
+            cache_dir=args.cache_dir,
+            max_files=args.max_files,
+            audio_duration=args.audio_duration,
+        )
 
     # add audio files to the dataset
     for split in dataset:
         audio_files = []
 
+        # get existing audio files
         for data in dataset[split]:
             file_name = hash_url(data["url"])
             if os.path.exists(os.path.join(args.cache_dir, f"{file_name}.mp3")):
@@ -83,17 +96,17 @@ if __name__ == "__main__":
     for split in dataset:
         dataset[split] = dataset[split].filter(lambda x: x["audio"] is not None)
 
-    # cast audio column
-    for split in dataset:
-        dataset[split] = dataset[split].cast_column(
-            "audio", Audio(mono=False, sampling_rate=44100)
-        )
-
     dataset = PromptCreator(
         dataset,
         use_cache=args.use_cache,
         batch_size=args.batch_size,
         cache_dir=args.cache_dir,
     ).create_prompt()
+
+    # cast audio column
+    for split in dataset:
+        dataset[split] = dataset[split].cast_column(
+            "audio", Audio(mono=False, sampling_rate=44100)
+        )
 
     dataset.push_to_hub(args.output_dataset)

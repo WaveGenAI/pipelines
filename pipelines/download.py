@@ -10,7 +10,11 @@ class Downloader:
     """Download audio from urls in the dataset"""
 
     def __init__(
-        self, dataset: Dataset, cache_dir: str = ".pipelines", max_files: int = 0
+        self,
+        dataset: Dataset,
+        cache_dir: str = ".pipelines",
+        max_files: int = 0,
+        audio_duration: int = 60 * 10,
     ):
         if not isinstance(max_files, int) or max_files < 0:
             raise ValueError(
@@ -20,7 +24,9 @@ class Downloader:
         self._dataset = dataset
         self._cache_dir = cache_dir
         self._max_files = max_files
-        self._ytb_downloader = YoutubeDownloader(cache_dir=cache_dir)
+        self._ytb_downloader = YoutubeDownloader(
+            cache_dir=cache_dir, audio_duration=audio_duration
+        )
 
         self._run()
 
