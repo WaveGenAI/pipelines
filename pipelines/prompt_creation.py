@@ -6,7 +6,7 @@ import torch
 from accelerate import Accelerator
 from datasets import Dataset
 from torch.utils.data import DataLoader
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 from pipelines.utils import get_bpm, hash_url
 
@@ -29,6 +29,16 @@ Here is the information:
 """
 
 
+def get_current_device() -> int:
+    """Get the current device. For GPU we return the local process index to enable multiple GPU training."""
+    return Accelerator().local_process_index if torch.cuda.is_available() else "cpu"
+
+
+def get_kbit_device_map() -> Union[Dict[str, int], None]:
+    """Useful for running inference with quantized models by setting `device_map=get_peft_device_map()`"""
+    return {"": get_current_device()} if torch.cuda.is_available() else None
+
+
 class PromptCreator:
     """Class to generate prompts"""
 
@@ -46,11 +56,15 @@ class PromptCreator:
 
         self.accelerator = Accelerator()
 
+        quantization_config = BitsAndBytesConfig(load_in_8bit=True)
+
         model = AutoModelForCausalLM.from_pretrained(
             "microsoft/Phi-3-mini-4k-instruct",
-            device_map="cuda",
             trust_remote_code=True,
-            torch_dtype=torch.float16,
+            torch_dtype=torch.bfloat16,
+            quantization_config=quantization_config,
+            device_map=get_kbit_device_map(),
+            low_cpu_mem_usage=True,
         )
 
         self.model = self.accelerator.prepare(model)
@@ -87,7 +101,7 @@ class PromptCreator:
         for key, value in row.items():
             if isinstance(value, str):
                 informations += f"{key}: {value}\n"[
-                    :2000
+                    :1500
                 ]  # limit the length of the prompt for vram
 
         chat = [
