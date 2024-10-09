@@ -56,12 +56,13 @@ class PromptCreator:
 
         self.accelerator = Accelerator()
 
-        quantization_config = BitsAndBytesConfig(load_in_8bit=True)
+        quantization_config = BitsAndBytesConfig(
+            load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16
+        )
 
         model = AutoModelForCausalLM.from_pretrained(
             "microsoft/Phi-3-mini-4k-instruct",
             trust_remote_code=True,
-            torch_dtype=torch.bfloat16,
             quantization_config=quantization_config,
             device_map=get_kbit_device_map(),
             low_cpu_mem_usage=True,
@@ -118,25 +119,26 @@ class PromptCreator:
 
         return chat
 
-    def _generate_step(self, batch: Dict[str, torch.Tensor], url: str) -> str:
+    def _load_prompt(self, sample: Dict[str, Any]) -> str:
+        """Load prompt from cache if it exists, otherwise return an empty string"""
+
+        file_name = hash_url(sample["url"])
+        cache_file = os.path.join(self._cache_dir, f"{file_name}.txt")
+
+        if os.path.exists(cache_file):
+            with open(cache_file, "r", encoding="utf-8") as file:
+                return file.read()
+
+        return ""
+
+    def _generate_step(self, batch: Dict[str, torch.Tensor]) -> List[str]:
         """Function to generate text from the model
 
         Args:
             batch (Dict[str, torch.Tensor]): Batch of input data
-            url (str): URL of the audio file
         Returns:
             torch.Tensor: Output ids from the model
         """
-
-        # check if the prompt is already generated
-        file_name = hash_url(url)
-        if self._use_cache and os.path.exists(
-            os.path.join(self._cache_dir, f"{file_name}.txt")
-        ):
-            with open(
-                os.path.join(self._cache_dir, f"{file_name}.txt"), "r", encoding="utf-8"
-            ) as file:
-                return file.read()
 
         output_ids = self.model.generate(
             batch["input_ids"],
@@ -144,16 +146,23 @@ class PromptCreator:
             max_new_tokens=500,
         )
 
-        prompt = self.tokenizer.decode(output_ids[0], skip_special_tokens=True).rsplit(
-            "Prompt:", 1
-        )[1]
+        generate_ids = output_ids[:, batch["input_ids"].shape[1] :]
+        prompt = self.tokenizer.batch_decode(generate_ids, skip_special_tokens=True)
 
-        with open(
-            os.path.join(self._cache_dir, f"{file_name}.txt"), "w", encoding="utf-8"
-        ) as file:
-            file.write(prompt)
+        # remove the first prompt word
+        prompt = [p.split("Prompt:")[1].strip() for p in prompt]
 
         return prompt
+
+    def _filter_dataset(self, dataset: Dataset) -> Dataset:
+        """Filter the dataset to keep only samples without generated prompts."""
+
+        def needs_generation(sample):
+            file_name = hash_url(sample["url"])
+            cache_file = os.path.join(self._cache_dir, f"{file_name}.txt")
+            return not os.path.exists(cache_file)
+
+        return dataset.filter(needs_generation)
 
     def create_prompt(self) -> Dataset:
         """Start the prompt creation process
@@ -162,8 +171,12 @@ class PromptCreator:
             Dataset: Dataset with the generated prompts
         """
         for split in self._dataset:
+            filtered_dataset = self._dataset[split]
+            if self._use_cache:
+                filtered_dataset = self._filter_dataset(self._dataset[split])
+
             data_loader = DataLoader(
-                self._dataset[split],
+                filtered_dataset,
                 batch_size=self._batch_size,
                 num_workers=self._batch_size + 3,
                 pin_memory=True,
@@ -172,21 +185,27 @@ class PromptCreator:
 
             data_loader = self.accelerator.prepare(data_loader)
 
-            generated_prompts = []
+            # Generate prompts for filtered samples
             for idx, batch in enumerate(data_loader):
-                prompt = self._generate_step(batch, self._dataset[split][idx]["url"])
-                generated_prompts.append(prompt)
+                prompts = self._generate_step(batch)
+                for idx_2, prompt in enumerate(prompts):
+                    url = filtered_dataset[idx * self._batch_size + idx_2]["url"]
+                    file_name = hash_url(url)
+                    with open(
+                        os.path.join(self._cache_dir, f"{file_name}.txt"),
+                        "w",
+                        encoding="utf-8",
+                    ) as file:
+                        file.write(prompt)
 
-                self._logger.info(
-                    "Generated prompt for %s (%s%%): \n%s",
-                    self._dataset[split][idx]["url"],
-                    round((idx + 1) / len(data_loader) * 100, 2),
-                    prompt,
-                )
+                    self._logger.info("Generated prompt for %s: \n%s", url, prompt)
 
+            self.accelerator.wait_for_everyone()
+
+            all_prompts = [self._load_prompt(sample) for sample in self._dataset[split]]
             # add a column for the generated prompts
             self._dataset[split] = self._dataset[split].add_column(
-                "generated_prompt", generated_prompts
+                "generated_prompt", all_prompts
             )
 
         return self._dataset

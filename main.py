@@ -68,7 +68,7 @@ if __name__ == "__main__":
     if args.shuffle:
         for split in dataset:
             dataset[split] = dataset[split].shuffle(seed=42)
-            dataset[split] = dataset[split].flatten_indices()
+            dataset[split] = dataset[split].flatten_indices()  # for performance
 
     if args.download:
         Downloader(
