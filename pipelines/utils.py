@@ -45,10 +45,18 @@ def cut_audio(file_path: str, duration: int):
         file_path (str): Path to the audio file
         duration (int): Duration to cut the audio file
     """
+
+    # get the duration of the audio file
+    audio_info = ffmpeg.probe(file_path)
+    audio_duration = int(float(audio_info["format"]["duration"]))
+
+    if audio_duration <= duration:
+        return
+
     # copy the input file to avoid overwriting the original file
     ffmpeg.input(file_path).output(
         file_path + ".tmp", format="mp3", loglevel="quiet"
-    ).run()
+    ).run(overwrite_output=True)
     copy_input_file = file_path + ".tmp"
 
     # cut the audio file
