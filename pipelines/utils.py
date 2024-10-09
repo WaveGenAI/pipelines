@@ -33,9 +33,9 @@ def get_bpm(audio: str, duration: int = 30) -> int:
 
     audio, sampling_rate = sf.read(audio, frames=sampling_rate * duration)
     onset_env = librosa.onset.onset_strength(y=audio.T, sr=sampling_rate)
-    tempo = librosa.beat.tempo(onset_envelope=onset_env, sr=sampling_rate)
+    tempo = librosa.beat.tempo(onset_envelope=onset_env, sr=sampling_rate)[0]
 
-    return int(tempo[0][0])
+    return int(tempo)
 
 
 def cut_audio(file_path: str, duration: int):
