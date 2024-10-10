@@ -102,7 +102,7 @@ class PromptCreator:
         for key, value in row.items():
             if isinstance(value, str):
                 informations += f"{key}: {value}\n"[
-                    :1500
+                    :1000
                 ]  # limit the length of the prompt for vram
 
         chat = [
