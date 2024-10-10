@@ -198,7 +198,17 @@ class PromptCreator:
                     ) as file:
                         file.write(prompt)
 
-                    self._logger.info("Generated prompt for %s: \n%s", url, prompt)
+                    self._logger.info(
+                        "Generated prompt for %s (progress: %s%%): \n%s",
+                        url,
+                        round(
+                            (idx * self._batch_size + idx_2)
+                            / len(filtered_dataset)
+                            * 100,
+                            2,
+                        ),
+                        prompt,
+                    )
 
             self.accelerator.wait_for_everyone()
 
