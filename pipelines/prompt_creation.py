@@ -150,7 +150,7 @@ class PromptCreator:
         prompt = self.tokenizer.batch_decode(generate_ids, skip_special_tokens=True)
 
         # remove the first prompt word
-        prompt = [p.split("Prompt:")[1].strip() for p in prompt]
+        prompt = [p.replace("Prompt: ", "", 1).strip() for p in prompt]
 
         return prompt
 
