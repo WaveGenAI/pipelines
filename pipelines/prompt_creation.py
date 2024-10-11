@@ -175,6 +175,9 @@ class PromptCreator:
             if self._use_cache:
                 filtered_dataset = self._filter_dataset(self._dataset[split])
 
+            if len(filtered_dataset) == 0:
+                continue
+
             data_loader = DataLoader(
                 filtered_dataset,
                 batch_size=self._batch_size,
