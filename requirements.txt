@@ -2,4 +2,4 @@ datasets
 yt-dlp
 librosa
 ffmpeg-python
-
+accelerate

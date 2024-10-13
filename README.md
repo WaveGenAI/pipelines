@@ -16,7 +16,7 @@ This command installs all the necessary Python packages listed in the `requireme
 Start the proxy:
 
 ```bash
-sudo docker run -d --rm -it -p 3128:3128 -p 4444:4444 -e "TOR_INSTANCES=120" jourdelune/rotating-tor-http-proxy
+sudo docker run -d --rm -it -p 3128:3128 -p 4444:4444 -e "TOR_INSTANCES=40" jourdelune/rotating-tor-http-proxy
 ```
 
 ## Pipeline Steps
@@ -24,6 +24,10 @@ sudo docker run -d --rm -it -p 3128:3128 -p 4444:4444 -e "TOR_INSTANCES=120" jou
 ### 1. Downloader
 
 The downloader module is responsible for fetching audio files from various sources. It ensures that the files are downloaded and stored in the appropriate directory for further processing.
+
+```
+python3 -m scripts.downloader --input_dataset WaveGenAI/youtube-cc-by-music --cache_dir PATH --max_files 50000 --shuffle
+```
 
 ### 2. Prompt Creation
 
