@@ -1,6 +1,5 @@
 # Audio Pipelines for Creating a Music Dataset
-
-This repository provides a set of audio processing pipelines designed to facilitate the creation of a music dataset. The tools included allow for downloading audio files from URLs, transcribing audio into text, generating prompts, and splitting audio files into smaller chunks. Follow the setup instructions and use the provided commands to manage and preprocess your audio data effectively.
+This repository provides a set of audio processing pipelines designed to facilitate the creation of a music dataset. The tools included help in downloading audio files, creating prompts, and splitting audio into manageable segments.
 
 ## Setup
 
@@ -17,11 +16,19 @@ This command installs all the necessary Python packages listed in the `requireme
 Start the proxy:
 
 ```bash
-sudo docker run --rm -it -p 3128:3128 -p 4444:4444 -e "TOR_INSTANCES=120" jourdelune/rotating-tor-http-proxy
+sudo docker run -d --rm -it -p 3128:3128 -p 4444:4444 -e "TOR_INSTANCES=120" jourdelune/rotating-tor-http-proxy
 ```
 
-To run the pipelines
+## Pipeline Steps
 
-```bash
-python3 main.py  --huggingface SRC_DS --output_dataset TGT_DS --use_cache --cache_dir DIR --download
-```
+### 1. Downloader
+
+The downloader module is responsible for fetching audio files from various sources. It ensures that the files are downloaded and stored in the appropriate directory for further processing.
+
+### 2. Prompt Creation
+
+The prompt creation module generates prompts based on the downloaded audio files. These prompts can be used for various purposes, such as training machine learning models or creating metadata for the audio files.
+
+### 3. Split Audio
+
+The split audio module takes the downloaded audio files and splits them into smaller, manageable segments. This is useful for processing large audio files and making them easier to handle in subsequent steps.
