@@ -28,8 +28,4 @@ def gen_data():
 
 dataset = datasets.Dataset.from_generator(gen_data)
 audio_dataset = dataset.cast_column("audio", Audio(mono=False, sampling_rate=44100))
-
-for data in audio_dataset:
-    print(data)
-
 audio_dataset.push_to_hub(args.output_dataset)
