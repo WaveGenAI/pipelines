@@ -3,3 +3,4 @@ yt-dlp
 librosa
 ffmpeg-python
 accelerate
+bitsandbytes

@@ -1,9 +1,7 @@
 import hashlib
 
-import ffmpeg
 import librosa
 import soundfile as sf
-import os
 
 
 def hash_url(url: str) -> str:
@@ -36,33 +34,3 @@ def get_bpm(audio: str, duration: int = 30) -> int:
     tempo = librosa.beat.tempo(onset_envelope=onset_env, sr=sampling_rate)[0]
 
     return int(tempo)
-
-
-def cut_audio(file_path: str, duration: int):
-    """Function to cut the audio file to the given duration
-
-    Args:
-        file_path (str): Path to the audio file
-        duration (int): Duration to cut the audio file
-    """
-
-    # get the duration of the audio file
-    audio_info = ffmpeg.probe(file_path)
-    audio_duration = int(float(audio_info["format"]["duration"]))
-
-    if audio_duration <= duration:
-        return
-
-    # copy the input file to avoid overwriting the original file
-    ffmpeg.input(file_path).output(
-        file_path + ".tmp", format="mp3", loglevel="quiet"
-    ).run(overwrite_output=True)
-    copy_input_file = file_path + ".tmp"
-
-    # cut the audio file
-    ffmpeg.input(copy_input_file, format="mp3").filter(
-        "atrim", duration=duration
-    ).output(file_path, loglevel="quiet").run(overwrite_output=True)
-
-    # remove the copied file
-    os.remove(copy_input_file)

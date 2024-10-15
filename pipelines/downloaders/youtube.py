@@ -6,8 +6,6 @@ from concurrent.futures import ThreadPoolExecutor
 import ffmpeg
 from yt_dlp import YoutubeDL
 
-from pipelines.utils import cut_audio
-
 logging.basicConfig(level=logging.INFO)
 
 
@@ -72,12 +70,6 @@ class YoutubeDownloader:
                     )  # fix soundfile reading error
 
                     os.remove(os.path.join(self._cache_dir, f"{file_name}_.m4a"))
-
-                    # cut the audio file
-                    cut_audio(
-                        os.path.join(self._cache_dir, f"{file_name}.mp3"),
-                        self._audio_duration,
-                    )
 
                     success = True
                 except Exception as error:  # pylint: disable=broad-except
