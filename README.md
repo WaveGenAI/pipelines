@@ -40,8 +40,24 @@ python3 -m scripts.split_data --input_dir DIR --output_dir DIR  --remove-origina
 
 ### 3. Prompt Creation
 
-The prompt creation module generates prompts based on the downloaded audio files. These prompts can be used for various purposes, such as training machine learning models or creating metadata for the audio files.
+The prompt creation module generates prompts based on the descriptions of the audio.
 
 ```
 python3 -m scripts.prompt_creator --input_dataset HUGGING_FACE_DS --use_cache --cache_dir DIR
+```
+
+### 4. Push to huggingface
+
+Push the dataset to huggingface for further processing.
+
+```
+python3 -m scripts.push_to_huggingface --input_dir DIR --output_dataset NAME
+```
+
+### 5. Codec Conversion
+
+The codec conversion module converts audio files to DAC format, then it could be used to train a transformer model.
+
+```
+python3 -m scripts.codec_generator --input_dataset NAME --output_dataset NAME
 ```
