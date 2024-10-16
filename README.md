@@ -59,5 +59,5 @@ python3 -m scripts.push_to_huggingface --input_dir DIR --output_dataset NAME
 The codec conversion module converts audio files to DAC format, then it could be used to train a transformer model.
 
 ```
-python3 -m scripts.codec_generator --input_dataset NAME --output_dataset NAME
+python3 -m scripts.codec_generator --input_dataset NAME/DIR --output_dataset NAME --streaming
 ```
