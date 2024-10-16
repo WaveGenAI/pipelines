@@ -3,6 +3,7 @@ import glob
 import os
 
 import dac
+import soundfile as sf
 import torch
 from datasets import Audio, Dataset, DatasetDict, load_dataset
 
@@ -17,6 +18,12 @@ parser.add_argument(
     "--streaming",
     action="store_true",
     help="Whether to use the streaming version of the dataset",
+)
+parser.add_argument(
+    "--max_duration",
+    type=int,
+    default=60 * 5,
+    help="Maximum duration of the audio file (chunks of 30 seconds)",
 )
 parser.add_argument("--output_dataset", type=str, required=True)
 args = parser.parse_args()
@@ -35,15 +42,26 @@ def gen_data_from_directory(input_dir):
 
     def gen_data():
         for audio_file in glob.glob(BASE_DIR + "*.mp3"):
+            pos = int(audio_file.split("_")[-1].split(".")[0])
+
+            # Skip if the duration is too long
+            if pos * 30 > args.max_duration:
+                continue
+
             # Check if the corresponding JSON file exists
             prompt_file = os.path.join(BASE_DIR, audio_file.split("_")[0] + ".txt")
             if not os.path.exists(prompt_file):
                 continue
 
-            prompt = open(prompt_file, "r", encoding="utf-8").read().strip()
-            pos = audio_file.split("_")[-1].split(".")[0]
+            # try to open the audio file to check if it's valid
+            try:
+                _, _ = sf.read(audio_file)
+            except (sf.LibsndfileError, ValueError):
+                continue
 
-            yield {"audio": audio_file, "prompt": prompt, "position": int(pos)}
+            prompt = open(prompt_file, "r", encoding="utf-8").read().strip()
+
+            yield {"audio": audio_file, "prompt": prompt, "position": pos}
 
     return gen_data
 

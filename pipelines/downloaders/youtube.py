@@ -27,6 +27,8 @@ class YoutubeDownloader:
         self.executor = ThreadPoolExecutor(max_workers=num_processes)
         self.futures = set()
 
+        # TODO: limit audio duration
+
     def _manage_futures(self):
         """Helper function to clean up completed futures and maintain a max of 10 threads."""
         # Check if any threads have finished and remove them
@@ -59,8 +61,11 @@ class YoutubeDownloader:
                 try:
                     ydl.download([url])
 
+                    # Convert m4a to mp3 and truncate the audio to max duration
                     ffmpeg.input(
-                        os.path.join(self._cache_dir, f"{file_name}_.m4a")
+                        os.path.join(self._cache_dir, f"{file_name}_.m4a").filter(
+                            "atrim", duration=self._audio_duration
+                        )
                     ).output(
                         os.path.join(self._cache_dir, f"{file_name}.mp3"), format="mp3"
                     ).global_args(
