@@ -63,10 +63,8 @@ class YoutubeDownloader:
 
                     # Convert m4a to mp3 and truncate the audio to max duration
                     ffmpeg.input(
-                        os.path.join(self._cache_dir, f"{file_name}_.m4a").filter(
-                            "atrim", duration=self._audio_duration
-                        )
-                    ).output(
+                        os.path.join(self._cache_dir, f"{file_name}_.m4a")
+                    ).filter("atrim", duration=self._audio_duration).output(
                         os.path.join(self._cache_dir, f"{file_name}.mp3"), format="mp3"
                     ).global_args(
                         "-loglevel", "quiet"
