@@ -23,7 +23,15 @@ def gen_data():
         prompt = open(prompt_file, "r", encoding="utf-8").read().strip()
         pos = audio_file.split("_")[-1].split(".")[0]
 
-        yield {"audio": audio_file, "prompt": prompt, "position": int(pos)}
+        # Get the number of chunks
+        nb_chunks = len(glob.glob(BASE_DIR + f"{audio_file.split('_')[0]}_*.mp3"))
+
+        yield {
+            "audio": audio_file,
+            "prompt": prompt,
+            "chunk_id": int(pos),
+            "nb_chunks": nb_chunks,
+        }
 
 
 dataset = datasets.Dataset.from_generator(gen_data)
