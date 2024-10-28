@@ -7,6 +7,8 @@ import soundfile as sf
 import torch
 from datasets import Audio, Dataset, DatasetDict, load_dataset
 
+from pipelines.audio_mae import AudioMAEConfig, PretrainedAudioMAEEncoder
+
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--input_dataset",
@@ -28,10 +30,15 @@ parser.add_argument(
 parser.add_argument("--output_dataset", type=str, required=True)
 args = parser.parse_args()
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
 # Download the model
 model_path = dac.utils.download(model_type="44khz")
 model = dac.DAC.load(model_path)
-model.to("cuda")
+model.to(device)
+
+config = AudioMAEConfig()
+mae = PretrainedAudioMAEEncoder(config).load_model().to(device)
 
 
 def gen_data_from_directory(input_dir):
@@ -41,17 +48,25 @@ def gen_data_from_directory(input_dir):
     BASE_DIR = os.path.join(input_dir, "")
 
     def gen_data():
+        # precompute the number of chunks for each audio file
+        nb_chunks_map = {}
+        for file in glob.glob(os.path.join(BASE_DIR, "*.mp3")):
+            prefix = file.split("_")[0]
+
+            if prefix not in nb_chunks_map:
+                nb_chunks_map[prefix] = 1
+            else:
+                nb_chunks_map[prefix] += 1
+
         for audio_file in glob.glob(BASE_DIR + "*.mp3"):
-            pos = int(audio_file.split("_")[-1].split(".")[0])
-
-            # Skip if the duration is too long
-            if pos * 30 > args.max_duration:
-                continue
-
             # Check if the corresponding JSON file exists
             prompt_file = os.path.join(BASE_DIR, audio_file.split("_")[0] + ".txt")
             if not os.path.exists(prompt_file):
                 continue
+
+            pos = audio_file.split("_")[-1].split(".")[0]
+            # Get the number of chunks
+            nb_chunks = nb_chunks_map[audio_file.split("_")[0]]
 
             # try to open the audio file to check if it's valid
             try:
@@ -61,7 +76,12 @@ def gen_data_from_directory(input_dir):
 
             prompt = open(prompt_file, "r", encoding="utf-8").read().strip()
 
-            yield {"audio": audio_file, "prompt": prompt, "position": pos}
+            yield {
+                "audio": audio_file,
+                "prompt": prompt,
+                "chunk_id": int(pos),
+                "nb_chunks": nb_chunks,
+            }
 
     return gen_data
 
@@ -90,6 +110,8 @@ def dataset_generator():
         for data in dataset[split]:
             audio = torch.Tensor(data["audio"]["array"])
 
+            embd = mae.forward(data["audio"]["path"])
+
             # add channel dimension if needed (mono)
             if audio.dim() == 1:
                 audio = audio.unsqueeze(0)
@@ -99,12 +121,13 @@ def dataset_generator():
             x = model.preprocess(audio, data["audio"]["sampling_rate"])
             _, codes, _, _, _ = model.encode(x)
 
-            # get the prompt
-            prompt = data["prompt"]
+            # remove audio from the data
+            del data["audio"]
 
             yield {
-                "codes": codes.cpu().numpy(),
-                "prompt": prompt,
+                "codes": codes.long().cpu().numpy(),
+                "embd": embd.cpu().numpy(),
+                **data,
             }
 
 

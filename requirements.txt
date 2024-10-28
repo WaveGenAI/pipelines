@@ -4,3 +4,4 @@ librosa
 ffmpeg-python
 accelerate
 bitsandbytes
+timm

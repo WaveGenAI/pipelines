@@ -29,21 +29,20 @@ The downloader module is responsible for fetching audio files from various sourc
 python3 -m scripts.downloader --input_dataset WaveGenAI/youtube-cc-by-music --cache_dir PATH --max_files 50000 --shuffle
 ```
 
-### 2. Split Audio
-
-The split audio module takes the downloaded audio files and splits them into smaller, manageable segments. This is useful for processing large audio files and making them easier to handle in subsequent steps.
-
-```
-python3 -m scripts.split_data --input_dir DIR --output_dir DIR  --remove-original --chunk-size 30
-```
-
-
-### 3. Prompt Creation
+### 2. Prompt Creation
 
 The prompt creation module generates prompts based on the descriptions of the audio.
 
 ```
 python3 -m scripts.prompt_creator --input_dataset HUGGING_FACE_DS --use_cache --cache_dir DIR
+```
+
+### 3. Split Audio
+
+The split audio module takes the downloaded audio files and splits them into smaller, manageable segments. This is useful for processing large audio files and making them easier to handle in subsequent steps.
+
+```
+python3 -m scripts.split_data --input_dir DIR --output_dir DIR  --remove-original --chunk-size 30
 ```
 
 ### 4. Push to huggingface
