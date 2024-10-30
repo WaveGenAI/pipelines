@@ -132,4 +132,11 @@ def dataset_generator():
 
 
 codec_dataset = Dataset.from_generator(dataset_generator)
-codec_dataset.push_to_hub(args.output_dataset)
+
+# Push the dataset to the Hugging Face hub, retrying if it fails
+while True:
+    try:
+        codec_dataset.push_to_hub(args.output_dataset)
+        break
+    except Exception as e:
+        print(e)
