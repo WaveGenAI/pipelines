@@ -105,11 +105,11 @@ def create_webdataset(args):
     def process_dataset(files, split):
         # limit to 1GB per shard
         sink = wds.ShardWriter(
-            os.path.join(args.output_dataset, f"data/{split}-%06d.tar"), maxsize=0.5e9
+            os.path.join(args.output_dataset, f"data/{split}-%06d.tar"), maxsize=1e9
         )
 
         for idx, audio_file in enumerate(tqdm.tqdm(files, total=args.max_files)):
-            if idx >= args.max_files:
+            if args.max_files is not None and idx >= args.max_files:
                 break
 
             result = process_audio_file(audio_file, model, mae)
