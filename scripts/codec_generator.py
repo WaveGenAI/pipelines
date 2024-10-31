@@ -27,6 +27,12 @@ parser.add_argument(
     default=60 * 5,
     help="Maximum duration of the audio file (chunks of 30 seconds)",
 )
+parser.add_argument(
+    "--test_size",
+    type=int,
+    default=2000,
+    help="Number of elements to put in the test dataset",
+)
 parser.add_argument("--output_dataset", type=str, required=True)
 args = parser.parse_args()
 
@@ -68,6 +74,9 @@ def gen_data_from_directory(input_dir):
             # Get the number of chunks
             nb_chunks = nb_chunks_map[audio_file.split("_")[0]]
 
+            if int(pos) > 5:
+                continue
+
             # try to open the audio file to check if it's valid
             try:
                 _, _ = sf.read(audio_file)
@@ -101,13 +110,21 @@ else:
 
 
 @torch.no_grad()
-def dataset_generator():
+def dataset_generator(skip: int = None, take: int = None):
     """
     This function will be called by the Dataset.from_generator function.
     """
     # Iterate over the dataset splits
+    i = 0
     for split in dataset:
         for data in dataset[split]:
+            if skip is not None and i <= skip:
+                continue
+
+            if take is not None and i >= take:
+                return
+
+            i += 1
             audio = torch.Tensor(data["audio"]["array"])
 
             embd = mae.forward(data["audio"]["path"])
@@ -131,12 +148,25 @@ def dataset_generator():
             }
 
 
-codec_dataset = Dataset.from_generator(dataset_generator)
-
 # Push the dataset to the Hugging Face hub, retrying if it fails
 while True:
-    try:
-        codec_dataset.push_to_hub(args.output_dataset)
-        break
-    except Exception as e:
-        print(e)
+    # Create the test dataset with 2000 elements
+    test_dataset = Dataset.from_generator(
+        lambda: dataset_generator(skip=None, take=args.test_size)
+    )
+
+    # Create the training dataset by skipping the first 2000 elements
+    train_dataset = Dataset.from_generator(
+        lambda: dataset_generator(skip=args.test_size, take=None)
+    )
+
+    # Combine the datasets into a DatasetDict
+    codec_dataset = DatasetDict({"train": train_dataset, "test": test_dataset})
+
+    # Push the dataset to the Hugging Face hub, retrying if it fails
+    while True:
+        try:
+            codec_dataset.push_to_hub(args.output_dataset)
+            break
+        except Exception as e:
+            print(e)
