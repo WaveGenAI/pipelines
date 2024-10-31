@@ -60,3 +60,8 @@ The codec conversion module converts audio files to DAC format, then it could be
 ```
 python3 -m scripts.codec_generator --input_dataset DIR --output_dataset DIR  --max_files 500000
 ```
+
+To push to huggingface, use : 
+```
+huggingface-cli upload-large-folder DATASET_NAME --repo-type=dataset  DIR -num-workers=16
+```

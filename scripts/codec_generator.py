@@ -55,6 +55,9 @@ def process_audio_file(audio_file, model, mae):
     except Exception as e:
         return None
 
+    # resample the audio to 44.1kHz
+    audio = audio.resample(44100)
+
     base_name = audio_file.split("_")[0]
 
     #  get the prompt
@@ -102,7 +105,7 @@ def create_webdataset(args):
     def process_dataset(files, split):
         # limit to 1GB per shard
         sink = wds.ShardWriter(
-            os.path.join(args.output_dataset, f"data/{split}-%06d.tar"), maxsize=1e9
+            os.path.join(args.output_dataset, f"data/{split}-%06d.tar"), maxsize=0.5e9
         )
 
         for idx, audio_file in enumerate(tqdm.tqdm(files, total=args.max_files)):
