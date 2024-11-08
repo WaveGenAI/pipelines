@@ -48,7 +48,7 @@ def setup_models(device):
     return model, mae
 
 
-def process_audio_file(audio_file, model, mae):
+def process_audio_file(audio_file, model, mae, map_path_file):
     """Process an audio file to extract codes and embeddings"""
     try:
         audio = AudioSignal(audio_file)
@@ -75,10 +75,15 @@ def process_audio_file(audio_file, model, mae):
         x = model.preprocess(audio_data.to(model.device), audio.sample_rate)
         _, codes, _, _, _ = model.encode(x)
 
+    pos = audio_file.split("_")[1].split(".")[0]
+
     return {
-        "codes": codes.long().cpu().numpy(),
-        "embd": embd.cpu().numpy(),
-        "prompt": prompt,
+        "path.txt": audio_file,
+        "codes.npy": codes.long().cpu().numpy(),
+        "embd.npy": embd.cpu().numpy(),
+        "prompt.txt": prompt,
+        "chunk_id.txt": pos,
+        "total_chunks.txt": str(map_path_file[base_name]),
     }
 
 
@@ -102,6 +107,15 @@ def create_webdataset(args):
     random.shuffle(train_files)
     random.shuffle(test_files)
 
+    map_path_file = {}
+    for file in audio_files:
+        base_name = file.split("_")[0]
+
+        if base_name not in map_path_file:
+            map_path_file[base_name] = 1
+        else:
+            map_path_file[base_name] += 1
+
     def process_dataset(files, split):
         # limit to 1GB per shard
         sink = wds.ShardWriter(
@@ -112,20 +126,14 @@ def create_webdataset(args):
             if args.max_files is not None and idx >= args.max_files:
                 break
 
-            result = process_audio_file(audio_file, model, mae)
+            sample = process_audio_file(audio_file, model, mae, map_path_file)
 
-            if result is not None:
-                sample = {
-                    "__key__": f"sample_{idx}",
-                    "codes.npy": result["codes"],
-                    "embd.npy": result["embd"],
-                    "prompt.txt": result["prompt"],
-                }
+            if sample is not None:
+                sample["__key__"] = f"sample_{idx}"
                 sink.write(sample)
 
         sink.close()
 
-    # process_dataset(train_files, "train")
     process_dataset(train_files, "train")
     process_dataset(test_files, "test")
 
