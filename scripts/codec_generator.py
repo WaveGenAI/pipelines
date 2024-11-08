@@ -11,6 +11,9 @@ from audiotools import AudioSignal
 
 from pipelines.audio_mae import AudioMAEConfig, PretrainedAudioMAEEncoder
 
+# set seed for reproducibility
+random.seed(42)
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
